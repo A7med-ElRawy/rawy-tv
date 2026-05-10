@@ -37,6 +37,8 @@ export interface DetailedMovie extends Movie {
   Awards: string;
   backdrop_path?: string;
   cast?: CastMember[];
+  trailerKey?: string;
+  externalImdbId?: string;
 }
 
 const formatMovie = (tmdbMovie: any): Movie => ({
@@ -94,7 +96,7 @@ export const movieService = {
     const response = await axios.get(`${TMDB_BASE_URL}/${type}/${id}`, {
       params: { 
         api_key: TMDB_API_KEY,
-        append_to_response: 'credits,videos,release_dates'
+        append_to_response: 'credits,videos,release_dates,external_ids'
       },
     });
 
@@ -112,10 +114,17 @@ export const movieService = {
     const releaseDates = data.release_dates?.results?.find((r: any) => r.iso_3166_1 === 'US')?.release_dates || [];
     const certification = releaseDates[0]?.certification || 'N/A';
 
+    const trailer = data.videos?.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') 
+      || data.videos?.results?.find((v: any) => v.site === 'YouTube')
+      || data.videos?.results?.[0];
+
+    const imdbId = data.imdb_id || data.external_ids?.imdb_id || '';
+
     const detailed: DetailedMovie = {
       Title: data.title || data.name,
       Year: (data.release_date || data.first_air_date || '').split('-')[0],
-      imdbID: data.id.toString(),
+      imdbID: data.id.toString(), // Internal ID should stay numeric TMDB ID
+      externalImdbId: imdbId,
       Type: type,
       Poster: data.poster_path ? `${IMAGE_BASE_URL}${data.poster_path}` : 'N/A',
       Rated: certification,
@@ -134,6 +143,7 @@ export const movieService = {
       Awards: 'N/A', // TMDB doesn't provide awards in primary response easily
       backdrop_path: data.backdrop_path ? `${BACKDROP_BASE_URL}${data.backdrop_path}` : undefined,
       cast: cast,
+      trailerKey: trailer?.key,
       Response: 'True'
     };
 

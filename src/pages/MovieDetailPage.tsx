@@ -133,7 +133,7 @@ const MovieDetailPage: React.FC = () => {
 
             <div className="flex flex-col gap-3 mt-8">
               <button
-                onClick={() => window.open(`https://streamimdb.ru/embed/${movie.Type}/${movie.imdbID}`, '_blank')}
+                onClick={() => window.open(`https://streamimdb.ru/embed/${movie.Type}/${movie.externalImdbId || movie.imdbID}`, '_blank')}
                 className="flex items-center justify-center gap-3 py-5 bg-brand text-white font-black uppercase tracking-widest text-sm transition-all hover:bg-brand/80 mb-2 shadow-[0_20px_50px_rgba(229,9,20,0.4)] group/watch"
               >
                 <Play className="w-5 h-5 fill-current group-hover/watch:scale-110 transition-transform" />
@@ -202,11 +202,27 @@ const MovieDetailPage: React.FC = () => {
             </div>
 
             <div className="mb-16 max-w-3xl">
-              <h3 className="text-sm font-black uppercase tracking-[3px] text-zinc-600 mb-4">Synopsis</h3>
+              <h3 className="text-sm font-black uppercase tracking-[3px] text-zinc-600 mb-4 font-display">Synopsis</h3>
               <p className="text-white leading-relaxed text-xl lg:text-2xl font-medium tracking-tight">
                 {movie.Plot}
               </p>
             </div>
+
+            {movie.trailerKey && (
+              <div className="mb-16">
+                <h3 className="text-sm font-black uppercase tracking-[3px] text-zinc-600 mb-6 font-display uppercase">Official Trailer</h3>
+                <div className="aspect-video w-full bg-zinc-900 border border-white/10 shadow-2xl overflow-hidden relative">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${movie.trailerKey}`}
+                    title={`${movie.Title} Trailer`}
+                    className="absolute inset-0 w-full h-full"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-12 mb-16">
               <div>
