@@ -1,36 +1,52 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Heart, Clock, Star } from 'lucide-react';
-import { motion } from 'motion/react';
-import { Movie } from '../services/movieService';
-import { useMovies } from '../context/MovieContext';
+import React from "react";
+import { Link } from "react-router-dom";
+import { Heart, Clock, Star } from "lucide-react";
+import { motion } from "motion/react";
+import { Movie } from "../services/movieService";
+import { useMovies } from "../context/MovieContext";
 
 interface MovieCardProps {
   movie: Movie;
 }
 
 const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
-  const { favorites, watchLater, toggleFavorite, toggleWatchLater, ratings } = useMovies();
-  
-  const isFavorite = favorites.includes(movie.imdbID);
-  const isWatchLater = watchLater.includes(movie.imdbID);
+  const { favorites, watchLater, toggleFavorite, toggleWatchLater, ratings } =
+    useMovies();
+
+  const isFavorite = favorites.some((fav) => fav.imdbID === movie.imdbID);
+  const isWatchLater = watchLater.some((m) => m.imdbID === movie.imdbID);
   const userRating = ratings[movie.imdbID];
+
+  const movieData = {
+    imdbID: movie.imdbID,
+    Title: movie.Title,
+    Poster: movie.Poster,
+    Year: movie.Year,
+    Type: movie.Type,
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ scale: 1.05, zIndex: 10 }}
-      className="group relative bg-surface rounded-none overflow-hidden border border-white/5 transition-all aspect-[2/3]"
+      className="group relative bg-surface rounded-none overflow-hidden border border-white/5 transition-all aspect-2/3"
     >
-      <Link to={`/movie/${movie.imdbID}?type=${movie.Type}`} className="block w-full h-full">
+      <Link
+        to={`/movie/${movie.imdbID}?type=${movie.Type}`}
+        className="block w-full h-full"
+      >
         <img
-          src={movie.Poster !== 'N/A' ? movie.Poster : 'https://via.placeholder.com/400x600?text=No+Poster'}
+          src={
+            movie.Poster !== "N/A"
+              ? movie.Poster
+              : "https://via.placeholder.com/400x600?text=No+Poster"
+          }
           alt={movie.Title}
           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
           referrerPolicy="no-referrer"
         />
-        
+
         {/* Card Overlay */}
         <div className="absolute inset-x-0 bottom-0 p-4 bg-linear-to-t from-black via-black/80 to-transparent flex flex-col justify-end min-h-[50%]">
           <div className="flex justify-between items-end gap-2">
@@ -39,9 +55,13 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
                 {movie.Title}
               </h3>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black text-accent-green uppercase">{movie.Year}</span>
+                <span className="text-[9px] font-black text-accent-green uppercase">
+                  {movie.Year}
+                </span>
                 <span className="w-0.5 h-0.5 rounded-full bg-zinc-700" />
-                <span className="text-[9px] font-black text-zinc-500 uppercase">{movie.Type}</span>
+                <span className="text-[9px] font-black text-zinc-500 uppercase">
+                  {movie.Type}
+                </span>
               </div>
             </div>
             {userRating && (
@@ -58,21 +78,25 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         <button
           onClick={(e) => {
             e.preventDefault();
-            toggleFavorite(movie.imdbID);
+            toggleFavorite(movieData);
           }}
           className={`w-8 h-8 flex items-center justify-center rounded-sm backdrop-blur-md border ${
-            isFavorite ? 'bg-brand border-brand text-white' : 'bg-black/60 border-white/20 text-white hover:bg-white hover:text-black'
+            isFavorite
+              ? "bg-brand border-brand text-white"
+              : "bg-black/60 border-white/20 text-white hover:bg-white hover:text-black"
           } transition-colors`}
         >
-          <Heart className={`w-3 h-3 ${isFavorite ? 'fill-current' : ''}`} />
+          <Heart className={`w-3 h-3 ${isFavorite ? "fill-current" : ""}`} />
         </button>
         <button
           onClick={(e) => {
             e.preventDefault();
-            toggleWatchLater(movie.imdbID);
+            toggleWatchLater(movieData);
           }}
           className={`w-8 h-8 flex items-center justify-center rounded-sm backdrop-blur-md border ${
-            isWatchLater ? 'bg-white border-white text-black' : 'bg-black/60 border-white/20 text-white hover:bg-white hover:text-black'
+            isWatchLater
+              ? "bg-white border-white text-black"
+              : "bg-black/60 border-white/20 text-white hover:bg-white hover:text-black"
           } transition-colors`}
         >
           <Clock className="w-3 h-3" />

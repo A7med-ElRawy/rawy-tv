@@ -1,27 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { Heart, Clock, Loader2, PlayCircle, PlusCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useMovies } from '../context/MovieContext';
-import { movieService, Movie } from '../services/movieService';
-import MovieCard from '../components/MovieCard';
+import React, { useState, useEffect } from "react";
+import { Heart, Clock, Loader2, PlayCircle, PlusCircle } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { useMovies } from "../context/MovieContext";
+import { movieService, Movie } from "../services/movieService";
+import MovieCard from "../components/MovieCard";
+import { useLanguage } from "../context/LanguageContext";
 
 const LibraryPage: React.FC = () => {
+  const { t, language } = useLanguage();
   const { favorites, watchLater } = useMovies();
-  const [activeTab, setActiveTab] = useState<'favorites' | 'watchLater'>('favorites');
+  const [activeTab, setActiveTab] = useState<"favorites" | "watchLater">(
+    "favorites",
+  );
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const list = activeTab === 'favorites' ? favorites : watchLater;
-    
+    const list = activeTab === "favorites" ? favorites : watchLater;
+
     const fetchMovies = async () => {
       setLoading(true);
       try {
-        const moviePromises = list.map(id => movieService.getMovieDetails(id));
+        const moviePromises = list.map((movieData) =>
+          movieService.getMovieDetails(movieData.imdbID, "movie", language),
+        );
         const results = await Promise.all(moviePromises);
-        setMovies(results.filter(m => m.Response === 'True'));
+        setMovies(results.filter((m) => m.Response === "True"));
       } catch (err) {
-        console.error('Error fetching library movies:', err);
+        console.error("Error fetching library movies:", err);
       } finally {
         setLoading(false);
       }
@@ -32,41 +38,49 @@ const LibraryPage: React.FC = () => {
     } else {
       setMovies([]);
     }
-  }, [activeTab, favorites, watchLater]);
+  }, [activeTab, favorites, watchLater, language]);
 
   return (
     <div className="p-6 lg:p-10 pb-32">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-16 border-b border-zinc-900 pb-10">
         <div>
-          <h1 className="text-6xl lg:text-8xl font-black mb-2 leading-none">Library</h1>
-          <p className="text-zinc-500 font-black text-[10px] uppercase tracking-[4px]">Private Collection</p>
+          <h1 className="text-6xl lg:text-8xl font-black mb-2 leading-none">
+            {t("library")}
+          </h1>
+          <p className="text-zinc-500 font-black text-[10px] uppercase tracking-[4px]">
+            {t("privateCollection")}
+          </p>
         </div>
 
         <div className="flex bg-zinc-900/50 p-1 border border-white/5 rounded-none self-start">
           <button
-            onClick={() => setActiveTab('favorites')}
+            onClick={() => setActiveTab("favorites")}
             className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all ${
-              activeTab === 'favorites' 
-                ? 'bg-white text-black' 
-                : 'text-zinc-600 hover:text-white'
+              activeTab === "favorites"
+                ? "bg-white text-black"
+                : "text-zinc-600 hover:text-white"
             }`}
           >
-            Favorites
+            {t("favorites")}
             {favorites.length > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">{favorites.length}</span>
+              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">
+                {favorites.length}
+              </span>
             )}
           </button>
           <button
-            onClick={() => setActiveTab('watchLater')}
+            onClick={() => setActiveTab("watchLater")}
             className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all ${
-              activeTab === 'watchLater' 
-                ? 'bg-white text-black' 
-                : 'text-zinc-600 hover:text-white'
+              activeTab === "watchLater"
+                ? "bg-white text-black"
+                : "text-zinc-600 hover:text-white"
             }`}
           >
-            Queue
+            {t("queue")}
             {watchLater.length > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">{watchLater.length}</span>
+              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">
+                {watchLater.length}
+              </span>
             )}
           </button>
         </div>
@@ -82,7 +96,7 @@ const LibraryPage: React.FC = () => {
             className="flex flex-col items-center justify-center py-32"
           >
             <Loader2 className="w-12 h-12 text-zinc-300 animate-spin mb-4" />
-            <p className="text-zinc-500 font-medium">Updating collections...</p>
+            <p className="text-zinc-500 font-medium">{t("updatingCollections")}</p>
           </motion.div>
         ) : movies.length === 0 ? (
           <motion.div
@@ -93,15 +107,15 @@ const LibraryPage: React.FC = () => {
             className="flex flex-col items-center justify-center py-32 text-center"
           >
             <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-zinc-800">
-              {activeTab === 'favorites' ? (
+              {activeTab === "favorites" ? (
                 <PlusCircle className="w-10 h-10 text-zinc-800" />
               ) : (
                 <PlayCircle className="w-10 h-10 text-zinc-800" />
               )}
             </div>
-            <h2 className="text-2xl font-bold mb-2">No movies here yet</h2>
+            <h2 className="text-2xl font-bold mb-2">{t("noMoviesHere")}</h2>
             <p className="text-zinc-500 max-w-sm mb-8">
-              Start exploring and save movies to your {activeTab === 'favorites' ? 'favorites' : 'watch later'} list for quick access.
+              {t("startExploring")} {activeTab === "favorites" ? t("favorites").toLowerCase() : t("queue").toLowerCase()} {t("forQuickAccess")}
             </p>
           </motion.div>
         ) : (

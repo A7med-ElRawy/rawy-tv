@@ -1,62 +1,147 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
+import {
+  toggleFavorite,
+  toggleWatchLater,
+  setMovieRating,
+  getUserFavorites,
+  getUserWatchLater,
+  getUserRatings,
+  MovieData,
+} from "../utils/firebaseUtils";
 
 interface MovieContextType {
-  favorites: string[];
-  watchLater: string[];
+  favorites: MovieData[];
+  watchLater: MovieData[];
   ratings: Record<string, number>;
-  toggleFavorite: (id: string) => void;
-  toggleWatchLater: (id: string) => void;
-  setRating: (id: string, rating: number) => void;
+  toggleFavorite: (movieData: MovieData) => Promise<void>;
+  toggleWatchLater: (movieData: MovieData) => Promise<void>;
+  setRating: (id: string, rating: number) => Promise<void>;
+  loading: boolean;
 }
 
 const MovieContext = createContext<MovieContextType | undefined>(undefined);
 
-export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem('favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
+export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { user } = useAuth();
+  const [favorites, setFavorites] = useState<MovieData[]>([]);
+  const [watchLater, setWatchLater] = useState<MovieData[]>([]);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(false);
 
-  const [watchLater, setWatchLater] = useState<string[]>(() => {
-    const saved = localStorage.getItem('watchLater');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [ratings, setRatings] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('ratings');
-    return saved ? JSON.parse(saved) : {};
-  });
-
+  // Fetch user data from Firestore when user changes
   useEffect(() => {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-  }, [favorites]);
+    if (!user) {
+      setFavorites([]);
+      setWatchLater([]);
+      setRatings({});
+      return;
+    }
 
-  useEffect(() => {
-    localStorage.setItem('watchLater', JSON.stringify(watchLater));
-  }, [watchLater]);
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        const [favs, watchLaterMovies, userRatings] = await Promise.all([
+          getUserFavorites(user.uid),
+          getUserWatchLater(user.uid),
+          getUserRatings(user.uid),
+        ]);
 
-  useEffect(() => {
-    localStorage.setItem('ratings', JSON.stringify(ratings));
-  }, [ratings]);
+        setFavorites(favs);
+        setWatchLater(watchLaterMovies);
+        setRatings(userRatings);
+      } catch (error) {
+        console.error("Error fetching user data from Firestore:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+    fetchUserData();
+  }, [user]);
+
+  const handleToggleFavorite = async (movieData: MovieData) => {
+    if (!user) {
+      console.error("User not logged in");
+      return;
+    }
+
+    try {
+      // Optimistic update
+      setFavorites((prev) =>
+        prev.some((fav) => fav.imdbID === movieData.imdbID)
+          ? prev.filter((fav) => fav.imdbID !== movieData.imdbID)
+          : [...prev, movieData],
+      );
+
+      // Update Firestore
+      await toggleFavorite(user.uid, movieData);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      // Revert optimistic update
+      const favs = await getUserFavorites(user.uid);
+      setFavorites(favs);
+    }
   };
 
-  const toggleWatchLater = (id: string) => {
-    setWatchLater(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+  const handleToggleWatchLater = async (movieData: MovieData) => {
+    if (!user) {
+      console.error("User not logged in");
+      return;
+    }
+
+    try {
+      // Optimistic update
+      setWatchLater((prev) =>
+        prev.some((m) => m.imdbID === movieData.imdbID)
+          ? prev.filter((m) => m.imdbID !== movieData.imdbID)
+          : [...prev, movieData],
+      );
+
+      // Update Firestore
+      await toggleWatchLater(user.uid, movieData);
+    } catch (error) {
+      console.error("Error toggling watch later:", error);
+      // Revert optimistic update
+      const watchLaterMovies = await getUserWatchLater(user.uid);
+      setWatchLater(watchLaterMovies);
+    }
   };
 
-  const setRating = (id: string, rating: number) => {
-    setRatings(prev => ({ ...prev, [id]: rating }));
+  const handleSetRating = async (id: string, rating: number) => {
+    if (!user) {
+      console.error("User not logged in");
+      return;
+    }
+
+    try {
+      // Optimistic update
+      setRatings((prev) => ({ ...prev, [id]: rating }));
+
+      // Update Firestore
+      await setMovieRating(user.uid, id, rating);
+    } catch (error) {
+      console.error("Error setting rating:", error);
+      // Revert optimistic update
+      const userRatings = await getUserRatings(user.uid);
+      setRatings(userRatings);
+    }
   };
 
   return (
-    <MovieContext.Provider value={{ favorites, watchLater, ratings, toggleFavorite, toggleWatchLater, setRating }}>
+    <MovieContext.Provider
+      value={{
+        favorites,
+        watchLater,
+        ratings,
+        toggleFavorite: handleToggleFavorite,
+        toggleWatchLater: handleToggleWatchLater,
+        setRating: handleSetRating,
+        loading,
+      }}
+    >
       {children}
     </MovieContext.Provider>
   );
@@ -65,7 +150,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useMovies = () => {
   const context = useContext(MovieContext);
   if (context === undefined) {
-    throw new Error('useMovies must be used within a MovieProvider');
+    throw new Error("useMovies must be used within a MovieProvider");
   }
   return context;
 };

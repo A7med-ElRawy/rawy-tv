@@ -41,14 +41,20 @@ export interface DetailedMovie extends Movie {
   externalImdbId?: string;
 }
 
-const formatMovie = (tmdbMovie: any): Movie => ({
-  Title: tmdbMovie.title || tmdbMovie.name,
-  Year: (tmdbMovie.release_date || tmdbMovie.first_air_date || '').split('-')[0],
-  imdbID: tmdbMovie.id.toString(),
-  Type: tmdbMovie.media_type || (tmdbMovie.title ? 'movie' : 'tv'),
-  Poster: tmdbMovie.poster_path ? `${IMAGE_BASE_URL}${tmdbMovie.poster_path}` : 'N/A',
-  vote_average: tmdbMovie.vote_average,
-});
+const formatMovie = (tmdbMovie: any, lang?: string): Movie => {
+  let finalTitle = tmdbMovie.title || tmdbMovie.name;
+  if (lang === 'ar' && tmdbMovie.original_language === 'en') {
+    finalTitle = tmdbMovie.original_title || tmdbMovie.original_name || finalTitle;
+  }
+  return {
+    Title: finalTitle,
+    Year: (tmdbMovie.release_date || tmdbMovie.first_air_date || '').split('-')[0],
+    imdbID: tmdbMovie.id.toString(),
+    Type: tmdbMovie.media_type || (tmdbMovie.title ? 'movie' : 'tv'),
+    Poster: tmdbMovie.poster_path ? `${IMAGE_BASE_URL}${tmdbMovie.poster_path}` : 'N/A',
+    vote_average: tmdbMovie.vote_average,
+  };
+};
 
 export interface SearchResponse {
   Response: string;
@@ -58,26 +64,51 @@ export interface SearchResponse {
 }
 
 export const movieService = {
-  searchMovies: async (query: string, page = 1): Promise<SearchResponse> => {
-    // Special handling for predefined categories
+  searchMovies: async (query: string, page = 1, lang: string = 'en'): Promise<SearchResponse> => {
     let endpoint = '/search/multi';
-    let params: any = { api_key: TMDB_API_KEY, query, page };
+    let params: any = { 
+      api_key: TMDB_API_KEY, 
+      query, 
+      page,
+      language: lang === 'ar' ? 'ar-SA' : 'en-US'
+    };
 
     if (query === 'Popular') {
-      endpoint = '/movie/popular';
+      endpoint = lang === 'ar' ? '/discover/movie' : '/movie/popular';
+      if (lang === 'ar') {
+        params.sort_by = 'popularity.desc';
+        params.with_original_language = 'ar';
+      }
       delete params.query;
     } else if (query === 'Top 250') {
-      endpoint = '/movie/top_rated';
+      endpoint = lang === 'ar' ? '/discover/movie' : '/movie/top_rated';
+      if (lang === 'ar') {
+        params.sort_by = 'vote_average.desc';
+        params['vote_count.gte'] = 200;
+        params.with_original_language = 'ar';
+      }
       delete params.query;
     } else if (query === 'TV Series' || query === 'Popular Shows') {
-      endpoint = '/tv/popular';
+      endpoint = lang === 'ar' ? '/discover/tv' : '/tv/popular';
+      if (lang === 'ar') {
+        params.sort_by = 'popularity.desc';
+        params.with_original_language = 'ar';
+      }
       delete params.query;
     } else if (query === 'Top Rated') {
-      endpoint = '/tv/top_rated';
+      endpoint = lang === 'ar' ? '/discover/tv' : '/tv/top_rated';
+      if (lang === 'ar') {
+        params.sort_by = 'vote_average.desc';
+        params['vote_count.gte'] = 200;
+        params.with_original_language = 'ar';
+      }
       delete params.query;
     } else if (query === '2026') {
       endpoint = '/discover/movie';
       params.primary_release_year = 2026;
+      if (lang === 'ar') {
+        params.with_original_language = 'ar';
+      }
       delete params.query;
     }
 
@@ -85,17 +116,16 @@ export const movieService = {
     
     return {
       Response: 'True',
-      Search: response.data.results.map(formatMovie),
+      Search: response.data.results.map((m: any) => formatMovie(m, lang)),
       totalResults: response.data.total_results.toString(),
     };
   },
 
-  getMovieDetails: async (id: string, type: string = 'movie') => {
-    // Determine type if not provided (defaulting to movie for compatibility)
-    // In a real app we'd track media_type from search results
+  getMovieDetails: async (id: string, type: string = 'movie', lang: string = 'en') => {
     const response = await axios.get(`${TMDB_BASE_URL}/${type}/${id}`, {
       params: { 
         api_key: TMDB_API_KEY,
+        language: lang === 'ar' ? 'ar-SA' : 'en-US',
         append_to_response: 'credits,videos,release_dates,external_ids'
       },
     });
@@ -120,10 +150,15 @@ export const movieService = {
 
     const imdbId = data.imdb_id || data.external_ids?.imdb_id || '';
 
+    let finalTitle = data.title || data.name;
+    if (lang === 'ar' && data.original_language === 'en') {
+      finalTitle = data.original_title || data.original_name || finalTitle;
+    }
+
     const detailed: DetailedMovie = {
-      Title: data.title || data.name,
+      Title: finalTitle,
       Year: (data.release_date || data.first_air_date || '').split('-')[0],
-      imdbID: data.id.toString(), // Internal ID should stay numeric TMDB ID
+      imdbID: data.id.toString(),
       externalImdbId: imdbId,
       Type: type,
       Poster: data.poster_path ? `${IMAGE_BASE_URL}${data.poster_path}` : 'N/A',
@@ -140,7 +175,7 @@ export const movieService = {
       ],
       Metascore: Math.round(data.vote_average * 10).toString(),
       imdbRating: data.vote_average.toFixed(1),
-      Awards: 'N/A', // TMDB doesn't provide awards in primary response easily
+      Awards: 'N/A',
       backdrop_path: data.backdrop_path ? `${BACKDROP_BASE_URL}${data.backdrop_path}` : undefined,
       cast: cast,
       trailerKey: trailer?.key,
