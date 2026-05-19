@@ -48,7 +48,7 @@ function Navbar() {
 
       <button
         onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-        className="flex items-center gap-2 p-2 text-zinc-400 hover:text-white transition-colors"
+        className="flex items-center gap-2 p-2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
         title="Switch Language"
       >
         <Globe className="w-4 h-4" />

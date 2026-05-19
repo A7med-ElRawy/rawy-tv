@@ -43,7 +43,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
               : "https://via.placeholder.com/400x600?text=No+Poster"
           }
           alt={movie.Title}
-          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+          className="w-full h-full object-cover grayscale-0 md:grayscale md:group-hover:grayscale-0 transition-all duration-500"
           referrerPolicy="no-referrer"
         />
 
@@ -74,7 +74,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
       </Link>
 
       {/* Hover Actions */}
-      <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
         <button
           onClick={(e) => {
             e.preventDefault();

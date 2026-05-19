@@ -214,9 +214,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Unified Header with Search and Google Login */}
-        <header className="flex items-center justify-between px-6 lg:px-10 py-4 border-b border-zinc-900/50 bg-surface/95 backdrop-blur-xl z-30 shrink-0 gap-8">
-          {/* Left: Menu and Search */}
-          <div className="flex items-center gap-4 flex-1 min-w-0">
+        <header className="px-4 lg:px-10 py-3 border-b border-zinc-900/50 bg-surface/95 backdrop-blur-xl z-30 shrink-0">
+          {/* Row 1: Menu + Logo (mobile) + NavBar actions */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Left: hamburger (mobile) */}
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 -ml-2 lg:hidden text-zinc-400 hover:text-white transition-colors shrink-0"
@@ -224,8 +225,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Menu className="w-6 h-6" />
             </button>
 
-            <div className="flex-1 max-w-2xl">
-              <div className="relative group" ref={searchRef}>
+            {/* Center on mobile: logo text */}
+            <span className="lg:hidden text-base font-black tracking-tighter text-brand uppercase">
+              Movie Hub
+            </span>
+
+            {/* Desktop: search bar inline */}
+            <div className="hidden lg:flex flex-1 max-w-2xl">
+              <div className="relative group w-full" ref={searchRef}>
                 <form onSubmit={handleSearchSubmit}>
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {isSearching ? (
@@ -310,10 +317,98 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Right: NavBar with Google Login */}
+            <NavBar />
           </div>
 
-          {/* Right: NavBar with Google Login */}
-          <NavBar />
+          {/* Row 2 (mobile only): full-width search bar */}
+          <div className="lg:hidden mt-3" ref={searchRef}>
+            <div className="relative group">
+              <form onSubmit={handleSearchSubmit}>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {isSearching ? (
+                    <Loader2 className="w-4 h-4 text-brand animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4 text-zinc-500 group-focus-within:text-brand transition-all" />
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder={t("searchPlaceholder")}
+                  className="w-full bg-black/20 border border-white/10 rounded-none py-2.5 pl-12 pr-4 text-[10px] font-black uppercase tracking-[2px] focus:outline-none focus:border-brand focus:bg-black/40 transition-all placeholder:text-zinc-700"
+                />
+              </form>
+
+              {/* Mobile Suggestions Dropdown */}
+              <AnimatePresence>
+                {showSuggestions && suggestions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-card border border-zinc-800 shadow-2xl z-50 overflow-hidden"
+                  >
+                    <div className="p-3 border-b border-zinc-900 bg-zinc-900/50">
+                      <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[2px]">
+                        {t("quickResults")}
+                      </p>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {suggestions.map((movie) => (
+                        <button
+                          key={movie.imdbID}
+                          onClick={() => {
+                            setSearchTerm("");
+                            setShowSuggestions(false);
+                            navigate(
+                              `/movie/${movie.imdbID}?type=${movie.Type}`,
+                            );
+                          }}
+                          className="w-full flex items-center gap-4 p-3 hover:bg-zinc-800/50 transition-colors text-left border-b border-zinc-900/50 last:border-0"
+                        >
+                          <div className="w-10 h-14 shrink-0 bg-zinc-900 border border-zinc-800 overflow-hidden">
+                            <img
+                              src={
+                                movie.Poster !== "N/A"
+                                  ? movie.Poster
+                                  : "https://via.placeholder.com/100x150"
+                              }
+                              alt={movie.Title}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black uppercase tracking-tight truncate mb-0.5">
+                              {movie.Title}
+                            </p>
+                            <p className="text-[10px] font-bold text-zinc-500 uppercase">
+                              {movie.Year} • {movie.Type}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleSearchSubmit}
+                      className="w-full p-3 bg-zinc-900 text-center hover:bg-zinc-800 transition-colors"
+                    >
+                      <span className="text-[10px] font-black text-brand uppercase tracking-widest">
+                        {t("seeAllResults")} "{searchTerm}"
+                      </span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </header>
 
         {/* Dynamic Content */}
