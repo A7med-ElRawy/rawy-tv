@@ -59,41 +59,43 @@ function Navbar() {
       <div className="flex items-center gap-4">
         {user ? (
           <div className="flex items-center gap-3 group cursor-pointer">
-            <div className={`text-${language === 'ar' ? 'left' : 'right'} hidden md:block`}>
-              <p className="text-[10px] font-black text-brand uppercase tracking-widest">
-                {t("welcomeBack")}
-              </p>
-              <p className="text-xs font-bold text-white">
-                {userProfile?.displayName || user.displayName || "User"}
-              </p>
-            </div>
-
-            {/* Profile Avatar with fallback */}
-            {userProfile?.photoURL || user.photoURL ? (
-              <img
-                src={userProfile?.photoURL || user.photoURL || ""}
-                alt="profile"
-                className="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all object-cover"
-                onError={(e) => {
-                  // Fallback if image fails to load
-                  (e.target as HTMLImageElement).style.display = "none";
-                  const parent = (e.target as HTMLImageElement).parentElement;
-                  if (parent) {
-                    parent.innerHTML =
-                      '<div class="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all bg-brand/20 flex items-center justify-center"><span class="text-xs font-black text-brand">' +
-                      getInitials(userProfile?.displayName || user.displayName) +
-                      "</span></div>";
-                  }
-                }}
-              />
-            ) : (
-              // Fallback avatar with initials
-              <div className="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all bg-brand/20 flex items-center justify-center">
-                <span className="text-xs font-black text-brand">
-                  {getInitials(userProfile?.displayName || user.displayName)}
-                </span>
+            <Link to="/settings" className="flex items-center gap-3">
+              <div className={`text-${language === 'ar' ? 'left' : 'right'} hidden md:block`}>
+                <p className="text-[10px] font-black text-brand uppercase tracking-widest">
+                  {t("welcomeBack")}
+                </p>
+                <p className="text-xs font-bold text-white">
+                  {userProfile?.displayName || user.displayName || "User"}
+                </p>
               </div>
-            )}
+
+              {/* Profile Avatar with fallback */}
+              {userProfile?.photoURL || user.photoURL ? (
+                <img
+                  src={userProfile?.photoURL || user.photoURL || ""}
+                  alt="profile"
+                  className="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all object-cover"
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    (e.target as HTMLImageElement).style.display = "none";
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      parent.innerHTML =
+                        '<div class="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all bg-brand/20 flex items-center justify-center"><span class="text-xs font-black text-brand">' +
+                        getInitials(userProfile?.displayName || user.displayName) +
+                        "</span></div>";
+                    }
+                  }}
+                />
+              ) : (
+                // Fallback avatar with initials
+                <div className="w-8 h-8 rounded-full border-2 border-brand/50 group-hover:border-brand transition-all bg-brand/20 flex items-center justify-center">
+                  <span className="text-xs font-black text-brand">
+                    {getInitials(userProfile?.displayName || user.displayName)}
+                  </span>
+                </div>
+              )}
+            </Link>
 
             <button
               onClick={handleLogout}

@@ -7,6 +7,11 @@ import {
   arrayUnion,
   arrayRemove,
   DocumentSnapshot,
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 
@@ -15,9 +20,11 @@ export interface UserProfile {
   email: string;
   displayName: string | null;
   photoURL: string | null;
+  reviewPrivacy?: "public" | "friends" | "private";
   lastLogin: any;
   favorites: MovieData[];
   watchLater: MovieData[];
+  recentlyViewed?: MovieData[];
   lastWatched: MovieData | null;
   ratings: Record<string, number>;
   createdAt: any;
@@ -52,9 +59,11 @@ export const initializeUserProfile = async (
       email: userData.email,
       displayName: userData.displayName,
       photoURL: userData.photoURL,
+      reviewPrivacy: "public",
       lastLogin: serverTimestamp(),
       favorites: [],
       watchLater: [],
+      recentlyViewed: [],
       lastWatched: null,
       ratings: {},
       createdAt: serverTimestamp(),
@@ -250,3 +259,186 @@ export const isMovieInWatchLater = async (
   const watchLater = await getUserWatchLater(uid);
   return watchLater.some((movie) => movie.imdbID === movieId);
 };
+
+/**
+ * Update user profile details in Firestore
+ */
+export const updateUserProfile = async (
+  uid: string,
+  displayName: string | null,
+  photoURL: string | null,
+  reviewPrivacy?: "public" | "friends" | "private",
+): Promise<void> => {
+  const userRef = doc(db, "users", uid);
+  const updateData: any = {
+    displayName,
+    photoURL,
+  };
+  if (reviewPrivacy) {
+    updateData.reviewPrivacy = reviewPrivacy;
+  }
+  await updateDoc(userRef, updateData);
+
+  // Synchronize review privacy settings on all their past published reviews
+  if (reviewPrivacy) {
+    const reviewsCol = collection(db, "reviews");
+    const q = query(reviewsCol, where("uid", "==", uid));
+    const snap = await getDocs(q);
+    const promises = snap.docs.map((docSnap) =>
+      updateDoc(docSnap.ref, { privacy: reviewPrivacy })
+    );
+    await Promise.all(promises);
+  }
+};
+
+/**
+ * Add a movie to user's recently viewed list
+ */
+export const addToRecentlyViewed = async (
+  uid: string,
+  movieData: MovieData,
+): Promise<void> => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) return;
+
+  const currentRecent = userSnap.data().recentlyViewed || [];
+
+  // Remove duplicate of this movie
+  const filteredRecent = currentRecent.filter(
+    (movie: MovieData) => movie.imdbID !== movieData.imdbID
+  );
+
+  // Add to the front of the list, limit to 15
+  const newRecent = [
+    { ...movieData, viewedAt: new Date().toISOString() },
+    ...filteredRecent
+  ].slice(0, 15);
+
+  await updateDoc(userRef, {
+    recentlyViewed: newRecent,
+    lastWatched: {
+      ...movieData,
+      watchedAt: serverTimestamp(),
+    }
+  });
+};
+
+/**
+ * Get user's recently viewed movies
+ */
+export const getUserRecentlyViewed = async (uid: string): Promise<MovieData[]> => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) return [];
+
+  return userSnap.data().recentlyViewed || [];
+};
+
+export interface ReviewData {
+  id: string;
+  uid: string;
+  displayName: string | null;
+  photoURL: string | null;
+  imdbID: string;
+  movieTitle: string;
+  moviePoster: string;
+  movieYear: string;
+  movieType: string;
+  rating: number;
+  comment: string;
+  publishedAt: any;
+}
+
+/**
+ * Publish a movie review in Firestore
+ */
+export const publishMovieReview = async (
+  uid: string,
+  userProfile: any,
+  movieData: MovieData,
+  rating: number,
+  comment: string,
+  privacy: "public" | "friends" | "private" = "public",
+): Promise<void> => {
+  const reviewRef = doc(db, "reviews", `${uid}_${movieData.imdbID}`);
+  await setDoc(reviewRef, {
+    id: `${uid}_${movieData.imdbID}`,
+    uid,
+    displayName: userProfile?.displayName || "User",
+    photoURL: userProfile?.photoURL || "",
+    imdbID: movieData.imdbID,
+    movieTitle: movieData.Title,
+    moviePoster: movieData.Poster,
+    movieYear: movieData.Year,
+    movieType: movieData.Type,
+    rating,
+    comment,
+    privacy,
+    publishedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Get all reviews published for a specific movie
+ */
+export const getMovieReviews = async (imdbID: string): Promise<ReviewData[]> => {
+  const reviewsCol = collection(db, "reviews");
+  const q = query(reviewsCol, where("imdbID", "==", imdbID));
+  const snap = await getDocs(q);
+  const reviews: ReviewData[] = [];
+  snap.forEach((doc) => {
+    reviews.push(doc.data() as ReviewData);
+  });
+
+  // Sort by publishedAt desc
+  return reviews.sort((a, b) => {
+    const timeA = a.publishedAt?.seconds || 0;
+    const timeB = b.publishedAt?.seconds || 0;
+    return timeB - timeA;
+  });
+};
+
+/**
+ * Get all reviews written by a specific user
+ */
+export const getUserReviews = async (uid: string): Promise<ReviewData[]> => {
+  const reviewsCol = collection(db, "reviews");
+  const q = query(reviewsCol, where("uid", "==", uid));
+  const snap = await getDocs(q);
+  const reviews: ReviewData[] = [];
+  snap.forEach((doc) => {
+    reviews.push(doc.data() as ReviewData);
+  });
+  
+  // Sort by publishedAt desc
+  return reviews.sort((a, b) => {
+    const timeA = a.publishedAt?.seconds || 0;
+    const timeB = b.publishedAt?.seconds || 0;
+    return timeB - timeA;
+  });
+};
+
+/**
+ * Check if a user has written a review for a specific movie
+ */
+export const getMovieReviewForUser = async (uid: string, imdbID: string): Promise<ReviewData | null> => {
+  const reviewRef = doc(db, "reviews", `${uid}_${imdbID}`);
+  const reviewSnap = await getDoc(reviewRef);
+  if (reviewSnap.exists()) {
+    return reviewSnap.data() as ReviewData;
+  }
+  return null;
+};
+
+/**
+ * Delete a user review
+ */
+export const deleteMovieReview = async (uid: string, imdbID: string): Promise<void> => {
+  const reviewRef = doc(db, "reviews", `${uid}_${imdbID}`);
+  await deleteDoc(reviewRef);
+};
+
+

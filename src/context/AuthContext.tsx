@@ -10,6 +10,7 @@ import { auth } from "../../firebase";
 import {
   initializeUserProfile,
   getUserProfile,
+  updateUserProfile,
   UserProfile,
 } from "../utils/firebaseUtils";
 
@@ -19,6 +20,11 @@ interface AuthContextType {
   loading: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  updateProfileDetails: (
+    displayName: string | null,
+    photoURL: string | null,
+    reviewPrivacy?: "public" | "friends" | "private"
+  ) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const updateProfileDetails = async (
+    displayName: string | null,
+    photoURL: string | null,
+    reviewPrivacy?: "public" | "friends" | "private"
+  ) => {
+    if (!user) throw new Error("No user is logged in");
+    try {
+      await updateUserProfile(user.uid, displayName, photoURL, reviewPrivacy);
+      const profile = await getUserProfile(user.uid);
+      setUserProfile(profile);
+    } catch (error) {
+      console.error("Update Profile Error:", error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -84,7 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, userProfile, loading, loginWithGoogle, logout }}
+      value={{
+        user,
+        userProfile,
+        loading,
+        loginWithGoogle,
+        logout,
+        updateProfileDetails,
+      }}
     >
       {children}
     </AuthContext.Provider>

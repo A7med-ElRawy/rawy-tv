@@ -14,10 +14,14 @@ import {
   ArrowLeft,
   Play,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { movieService, DetailedMovie } from "../services/movieService";
 import { useMovies } from "../context/MovieContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
+import { publishMovieReview, getMovieReviewForUser, getMovieReviews, ReviewData } from "../utils/firebaseUtils";
+import MovieImage from "../components/MovieImage";
+
 
 const MovieDetailPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -31,12 +35,21 @@ const MovieDetailPage: React.FC = () => {
     toggleWatchLater,
     ratings,
     setRating,
+    addToRecent,
   } = useMovies();
+
+  const { user, userProfile } = useAuth();
 
   const [movie, setMovie] = useState<DetailedMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hoverRating, setHoverRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const [communityReviews, setCommunityReviews] = useState<ReviewData[]>([]);
+  const [loadingCommunity, setLoadingCommunity] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +63,13 @@ const MovieDetailPage: React.FC = () => {
         const data = await movieService.getMovieDetails(id, type, language);
         if (data.Response === "True") {
           setMovie(data);
+          addToRecent({
+            imdbID: data.imdbID,
+            Title: data.Title,
+            Poster: data.Poster,
+            Year: data.Year,
+            Type: data.Type,
+          });
         } else {
           setError("Movie not found");
         }
@@ -62,7 +82,70 @@ const MovieDetailPage: React.FC = () => {
 
     fetchDetails();
     window.scrollTo(0, 0);
-  }, [id, location.search, language]);
+  }, [id, location.search, language, addToRecent]);
+
+  useEffect(() => {
+    if (!user || !id) return;
+    const fetchUserReview = async () => {
+      try {
+        const existing = await getMovieReviewForUser(user.uid, id);
+        if (existing) {
+          setReviewComment(existing.comment);
+        }
+      } catch (err) {
+        console.error("Error fetching user review:", err);
+      }
+    };
+    fetchUserReview();
+  }, [user, id]);
+
+  const fetchCommunityReviews = async () => {
+    if (!id) return;
+    try {
+      const data = await getMovieReviews(id);
+      setCommunityReviews(data);
+    } catch (err) {
+      console.error("Error fetching community reviews:", err);
+    } finally {
+      setLoadingCommunity(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCommunityReviews();
+  }, [id]);
+
+  const handlePublishReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmittingReview(true);
+    setReviewStatus(null);
+
+    try {
+      await publishMovieReview(
+        user.uid,
+        userProfile,
+        movieData,
+        userRating || 5,
+        reviewComment.trim(),
+        userProfile?.reviewPrivacy || "public"
+      );
+      setReviewStatus({
+        type: "success",
+        message: t("reviewPublished"),
+      });
+      fetchCommunityReviews();
+    } catch (err) {
+      console.error(err);
+      setReviewStatus({
+        type: "error",
+        message: t("reviewError"),
+      });
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -150,12 +233,8 @@ const MovieDetailPage: React.FC = () => {
             className="w-full lg:w-[400px] shrink-0"
           >
             <div className="relative aspect-[2/3] rounded-none overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.8)] bg-card border border-white/10">
-              <img
-                src={
-                  movie.Poster !== "N/A"
-                    ? movie.Poster
-                    : "https://via.placeholder.com/400x600?text=No+Poster"
-                }
+              <MovieImage
+                src={movie.Poster}
                 alt={movie.Title}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -434,6 +513,164 @@ const MovieDetailPage: React.FC = () => {
               <p className="mt-4 text-[10px] font-black text-zinc-600 uppercase tracking-widest">
                 {t("hoverRate")}
               </p>
+            </div>
+
+            {/* Write a Review Block */}
+            {user && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 p-10 bg-white/5 rounded-none border border-white/10 relative overflow-hidden group"
+              >
+                <h3 className="text-xs font-black uppercase tracking-[3px] text-zinc-500 mb-6 font-display">
+                  {t("writeReview")}
+                </h3>
+
+                <AnimatePresence mode="wait">
+                  {reviewStatus && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className={`p-4 mb-6 flex items-start gap-3 border ${
+                        reviewStatus.type === "success"
+                          ? "bg-emerald-950/20 border-emerald-800/50 text-emerald-400"
+                          : "bg-red-950/20 border-red-800/50 text-red-400"
+                      }`}
+                    >
+                      <span className="text-xs font-bold leading-relaxed">{reviewStatus.message}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <form onSubmit={handlePublishReview} className="space-y-4">
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => {
+                      setReviewComment(e.target.value);
+                      setReviewStatus(null);
+                    }}
+                    required
+                    placeholder={t("reviewPlaceholder")}
+                    rows={4}
+                    className="w-full bg-black/40 border border-zinc-800 py-3.5 px-4 text-xs font-medium text-white focus:outline-none focus:border-brand focus:bg-black/60 transition-all tracking-wide resize-none placeholder:text-zinc-600"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview || !reviewComment.trim()}
+                    className="py-3.5 px-8 bg-brand text-white font-black uppercase text-[10px] tracking-[2px] hover:bg-white hover:text-black hover:shadow-[0_0_20px_rgba(229,9,20,0.4)] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isSubmittingReview ? t("publishing") : t("publish")}
+                  </button>
+                </form>
+              </motion.div>
+            )}
+
+            {/* Community Reviews Section */}
+            <div className="mt-12 pt-12 border-t border-zinc-900">
+              <h3 className="text-xl font-black uppercase tracking-[3px] text-white mb-8">
+                {t("communityReviews")}
+              </h3>
+
+              {loadingCommunity ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="w-8 h-8 text-brand animate-spin" />
+                </div>
+              ) : (() => {
+                const visibleReviews = communityReviews.filter((r) => {
+                  if (user && r.uid === user.uid) return true;
+                  return r.privacy === "public" || !r.privacy;
+                });
+
+                if (visibleReviews.length === 0) {
+                  return (
+                    <p className="text-zinc-500 text-xs font-black uppercase tracking-widest leading-relaxed">
+                      {t("noCommunityReviews")}
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {visibleReviews.map((rev) => {
+                      const isOwn = rev.uid === user?.uid;
+                      const getReviewInitials = (n: string | null) => {
+                        if (!n) return "U";
+                        return n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                      };
+                      return (
+                        <div
+                          key={rev.id}
+                          className={`p-6 border transition-all ${
+                            isOwn
+                              ? "bg-brand/5 border-brand/20"
+                              : "bg-zinc-900/20 border-zinc-800/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-3">
+                              {rev.photoURL ? (
+                                <img
+                                  src={rev.photoURL}
+                                  alt="reviewer"
+                                  className="w-9 h-9 rounded-full object-cover border border-zinc-700"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                    const parent = (e.target as HTMLImageElement).parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = `<div class="w-9 h-9 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-700"><span class="text-xs font-black text-brand">${getReviewInitials(rev.displayName)}</span></div>`;
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-700">
+                                  <span className="text-xs font-black text-brand">
+                                    {getReviewInitials(rev.displayName)}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-wider text-white">
+                                  {rev.displayName || "User"}
+                                  {isOwn && (
+                                    <span className="ml-2 text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight">
+                                      YOU
+                                    </span>
+                                  )}
+                                </p>
+                                {rev.publishedAt && (
+                                  <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">
+                                    {new Date(rev.publishedAt.seconds * 1000).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-3 h-3 ${
+                                    star <= rev.rating
+                                      ? "text-yellow-500 fill-current"
+                                      : "text-zinc-800"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <p className="text-zinc-300 text-xs font-medium leading-relaxed whitespace-pre-wrap">
+                            "{rev.comment}"
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </motion.div>
         </div>

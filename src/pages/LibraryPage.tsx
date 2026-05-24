@@ -8,21 +8,28 @@ import { useLanguage } from "../context/LanguageContext";
 
 const LibraryPage: React.FC = () => {
   const { t, language } = useLanguage();
-  const { favorites, watchLater } = useMovies();
-  const [activeTab, setActiveTab] = useState<"favorites" | "watchLater">(
+  const { favorites, watchLater, recentlyViewed } = useMovies();
+  const [activeTab, setActiveTab] = useState<"favorites" | "watchLater" | "recentlyViewed">(
     "favorites",
   );
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(
+    favorites.length > 0 || watchLater.length > 0 || recentlyViewed.length > 0
+  );
 
   useEffect(() => {
-    const list = activeTab === "favorites" ? favorites : watchLater;
+    const list =
+      activeTab === "favorites"
+        ? favorites
+        : activeTab === "watchLater"
+        ? watchLater
+        : recentlyViewed;
 
     const fetchMovies = async () => {
       setLoading(true);
       try {
         const moviePromises = list.map((movieData) =>
-          movieService.getMovieDetails(movieData.imdbID, "movie", language),
+          movieService.getMovieDetails(movieData.imdbID, movieData.Type || "movie", language),
         );
         const results = await Promise.all(moviePromises);
         setMovies(results.filter((m) => m.Response === "True"));
@@ -37,8 +44,9 @@ const LibraryPage: React.FC = () => {
       fetchMovies();
     } else {
       setMovies([]);
+      setLoading(false);
     }
-  }, [activeTab, favorites, watchLater, language]);
+  }, [activeTab, favorites, watchLater, recentlyViewed, language]);
 
   return (
     <div className="p-6 lg:p-10 pb-32">
@@ -52,10 +60,10 @@ const LibraryPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex bg-zinc-900/50 p-1 border border-white/5 rounded-none self-start">
+        <div className="flex bg-zinc-900/50 p-1 border border-white/5 rounded-none self-start overflow-x-auto">
           <button
             onClick={() => setActiveTab("favorites")}
-            className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer shrink-0 ${
               activeTab === "favorites"
                 ? "bg-white text-black"
                 : "text-zinc-600 hover:text-white"
@@ -70,7 +78,7 @@ const LibraryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("watchLater")}
-            className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all ${
+            className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer shrink-0 ${
               activeTab === "watchLater"
                 ? "bg-white text-black"
                 : "text-zinc-600 hover:text-white"
@@ -80,6 +88,21 @@ const LibraryPage: React.FC = () => {
             {watchLater.length > 0 && (
               <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">
                 {watchLater.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("recentlyViewed")}
+            className={`flex items-center gap-2 px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer shrink-0 ${
+              activeTab === "recentlyViewed"
+                ? "bg-white text-black"
+                : "text-zinc-600 hover:text-white"
+            }`}
+          >
+            {t("recent")}
+            {recentlyViewed.length > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded-none text-[9px]">
+                {recentlyViewed.length}
               </span>
             )}
           </button>
@@ -109,13 +132,23 @@ const LibraryPage: React.FC = () => {
             <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-zinc-800">
               {activeTab === "favorites" ? (
                 <PlusCircle className="w-10 h-10 text-zinc-800" />
-              ) : (
+              ) : activeTab === "watchLater" ? (
                 <PlayCircle className="w-10 h-10 text-zinc-800" />
+              ) : (
+                <Clock className="w-10 h-10 text-zinc-800" />
               )}
             </div>
-            <h2 className="text-2xl font-bold mb-2">{t("noMoviesHere")}</h2>
-            <p className="text-zinc-500 max-w-sm mb-8">
-              {t("startExploring")} {activeTab === "favorites" ? t("favorites").toLowerCase() : t("queue").toLowerCase()} {t("forQuickAccess")}
+            <h2 className="text-2xl font-bold mb-2">
+              {activeTab === "recentlyViewed" ? t("noRecent") : t("noMoviesHere")}
+            </h2>
+            <p className="text-zinc-500 max-w-sm mb-8 text-xs leading-relaxed uppercase tracking-widest font-black opacity-60">
+              {activeTab === "recentlyViewed"
+                ? t("noRecentDesc")
+                : `${t("startExploring")} ${
+                    activeTab === "favorites"
+                      ? t("favorites").toLowerCase()
+                      : t("queue").toLowerCase()
+                  } ${t("forQuickAccess")}`}
             </p>
           </motion.div>
         ) : (

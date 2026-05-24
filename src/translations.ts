@@ -44,8 +44,11 @@ export const translations = {
     privateCollection: "Private Collection",
     favorites: "Favorites",
     queue: "Queue",
+    recent: "Recent",
     updatingCollections: "Updating collections...",
     noMoviesHere: "No movies here yet",
+    noRecent: "No recently viewed titles yet",
+    noRecentDesc: "Start exploring and watch movies or TV shows to build your view history.",
     startExploring: "Start exploring and save movies to your",
     forQuickAccess: "list for quick access.",
 
@@ -74,6 +77,39 @@ export const translations = {
     // Movie Card
     score: "SCORE",
     viewDetails: "View Details",
+
+    // Settings Page
+    settings: "Settings",
+    profileSettings: "Profile Settings",
+    profileName: "Display Name",
+    profilePhoto: "Profile Photo URL",
+    saveChanges: "Save Changes",
+    updateSuccess: "Profile updated successfully!",
+    updateError: "Failed to update profile. Please try again.",
+    mustBeLoggedIn: "Please log in to manage your profile settings.",
+    choosePreset: "Or select a sleek preset avatar:",
+    updatingProfile: "Updating profile...",
+    uploadPhoto: "Upload Local Photo",
+
+    // Reviews Page
+    reviews: "Reviews",
+    writeReview: "Write a Review",
+    publish: "Publish Review",
+    reviewPlaceholder: "Share your thoughts about this movie...",
+    publishing: "Publishing...",
+    noReviews: "No reviews published yet",
+    noReviewsDesc: "Watch movies, share your reviews, and build your critique portfolio here.",
+    reviewPublished: "Review published successfully!",
+    reviewError: "Failed to publish review. Please try again.",
+    writtenOn: "Written on",
+
+    // Privacy Settings
+    privacySettings: "Critique Privacy",
+    showToAll: "Show my reviews to all users",
+    showToFriends: "Show my reviews to my friends",
+    dontShow: "Don't show my reviews to anyone",
+    communityReviews: "Community Reviews",
+    noCommunityReviews: "No community reviews yet. Be the first to share your thoughts!",
   },
   ar: {
     // Navigation & Common
@@ -118,8 +154,11 @@ export const translations = {
     privateCollection: "المجموعة الخاصة",
     favorites: "المفضلة",
     queue: "قائمة المشاهدة",
+    recent: "الأخيرة",
     updatingCollections: "تحديث المجموعات...",
     noMoviesHere: "لا توجد أفلام هنا بعد",
+    noRecent: "لا توجد عناوين شوهدت مؤخراً بعد",
+    noRecentDesc: "ابدأ الاستكشاف وشاهد الأفلام والمسلسلات لبناء سجل المشاهدة الخاص بك.",
     startExploring: "ابدأ في الاستكشاف واحفظ الأفلام في",
     forQuickAccess: "للوصول السريع.",
 
@@ -148,5 +187,38 @@ export const translations = {
     // Movie Card
     score: "النتيجة",
     viewDetails: "عرض التفاصيل",
+
+    // Settings Page
+    settings: "الإعدادات",
+    profileSettings: "إعدادات الملف الشخصي",
+    profileName: "الاسم المستعار",
+    profilePhoto: "رابط الصورة الشخصية",
+    saveChanges: "حفظ التغييرات",
+    updateSuccess: "تم تحديث الملف الشخصي بنجاح!",
+    updateError: "فشل تحديث الملف الشخصي. يرجى المحاولة مرة أخرى.",
+    mustBeLoggedIn: "يرجى تسجيل الدخول لإدارة إعدادات ملفك الشخصي.",
+    choosePreset: "أو اختر رمزاً تعبيرياً أنيقاً:",
+    updatingProfile: "جاري تحديث الملف...",
+    uploadPhoto: "رفع صورة محلية",
+
+    // Reviews Page
+    reviews: "التقييمات",
+    writeReview: "اكتب مراجعة",
+    publish: "نشر التقييم",
+    reviewPlaceholder: "شاركنا بأفكارك حول هذا العمل السينمائي...",
+    publishing: "جاري النشر...",
+    noReviews: "لم تنشر أي تقييمات بعد",
+    noReviewsDesc: "شاهد الأعمال وشارك تقييماتك وابنِ مراجعاتك السينمائية هنا.",
+    reviewPublished: "تم نشر التقييم بنجاح!",
+    reviewError: "فشل نشر التقييم. يرجى المحاولة مرة أخرى.",
+    writtenOn: "كتب في",
+
+    // Privacy Settings
+    privacySettings: "خصوصية المراجعات",
+    showToAll: "عرض مراجعاتي لجميع المستخدمين",
+    showToFriends: "عرض مراجعاتي لأصدقائي فقط",
+    dontShow: "عدم عرض مراجعاتي لأي أحد",
+    communityReviews: "مراجعات المجتمع",
+    noCommunityReviews: "لا توجد مراجعات للمجتمع بعد. كن أول من يشارك أفكاره!",
   },
 };

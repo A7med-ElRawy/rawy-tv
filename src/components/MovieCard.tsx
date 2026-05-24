@@ -4,6 +4,8 @@ import { Heart, Clock, Star } from "lucide-react";
 import { motion } from "motion/react";
 import { Movie } from "../services/movieService";
 import { useMovies } from "../context/MovieContext";
+import MovieImage from "./MovieImage";
+
 
 interface MovieCardProps {
   movie: Movie;
@@ -36,12 +38,8 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         to={`/movie/${movie.imdbID}?type=${movie.Type}`}
         className="block w-full h-full"
       >
-        <img
-          src={
-            movie.Poster !== "N/A"
-              ? movie.Poster
-              : "https://via.placeholder.com/400x600?text=No+Poster"
-          }
+        <MovieImage
+          src={movie.Poster}
           alt={movie.Title}
           className="w-full h-full object-cover grayscale-0 md:grayscale md:group-hover:grayscale-0 transition-all duration-500"
           referrerPolicy="no-referrer"

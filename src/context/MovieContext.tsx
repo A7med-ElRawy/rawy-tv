@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import {
   toggleFavorite,
@@ -7,16 +7,20 @@ import {
   getUserFavorites,
   getUserWatchLater,
   getUserRatings,
+  getUserRecentlyViewed,
+  addToRecentlyViewed,
   MovieData,
 } from "../utils/firebaseUtils";
 
 interface MovieContextType {
   favorites: MovieData[];
   watchLater: MovieData[];
+  recentlyViewed: MovieData[];
   ratings: Record<string, number>;
   toggleFavorite: (movieData: MovieData) => Promise<void>;
   toggleWatchLater: (movieData: MovieData) => Promise<void>;
   setRating: (id: string, rating: number) => Promise<void>;
+  addToRecent: (movieData: MovieData) => Promise<void>;
   loading: boolean;
 }
 
@@ -28,6 +32,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<MovieData[]>([]);
   const [watchLater, setWatchLater] = useState<MovieData[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<MovieData[]>([]);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
 
@@ -37,21 +42,24 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
       setFavorites([]);
       setWatchLater([]);
       setRatings({});
+      setRecentlyViewed([]);
       return;
     }
 
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const [favs, watchLaterMovies, userRatings] = await Promise.all([
+        const [favs, watchLaterMovies, userRatings, recentMovies] = await Promise.all([
           getUserFavorites(user.uid),
           getUserWatchLater(user.uid),
           getUserRatings(user.uid),
+          getUserRecentlyViewed(user.uid),
         ]);
 
         setFavorites(favs);
         setWatchLater(watchLaterMovies);
         setRatings(userRatings);
+        setRecentlyViewed(recentMovies);
       } catch (error) {
         console.error("Error fetching user data from Firestore:", error);
       } finally {
@@ -130,15 +138,31 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const handleAddToRecent = useCallback(async (movieData: MovieData) => {
+    if (!user) return;
+    try {
+      // Optimistic update
+      setRecentlyViewed((prev) => {
+        const filtered = prev.filter((m) => m.imdbID !== movieData.imdbID);
+        return [movieData, ...filtered].slice(0, 15);
+      });
+      await addToRecentlyViewed(user.uid, movieData);
+    } catch (error) {
+      console.error("Error adding to recently viewed:", error);
+    }
+  }, [user]);
+
   return (
     <MovieContext.Provider
       value={{
         favorites,
         watchLater,
+        recentlyViewed,
         ratings,
         toggleFavorite: handleToggleFavorite,
         toggleWatchLater: handleToggleWatchLater,
         setRating: handleSetRating,
+        addToRecent: handleAddToRecent,
         loading,
       }}
     >

@@ -9,11 +9,15 @@ import {
   Loader2,
   Film,
   PlayCircle,
+  Settings,
+  MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { movieService, Movie } from "../services/movieService";
 import NavBar from "./NavBar";
 import { useLanguage } from "../context/LanguageContext";
+import MovieImage from "./MovieImage";
+
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLanguage();
@@ -25,6 +29,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (query.length < 3) {
@@ -72,6 +78,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [location]);
+
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
@@ -83,6 +96,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = [
     { name: t("home"), path: "/", icon: Home },
     { name: t("library"), path: "/library", icon: Bookmark },
+    { name: t("reviews"), path: "/reviews", icon: MessageSquare },
+    { name: t("settings"), path: "/settings", icon: Settings },
   ];
 
   return (
@@ -282,12 +297,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                             className="w-full flex items-center gap-4 p-3 hover:bg-zinc-800/50 transition-colors text-left border-b border-zinc-900/50 last:border-0"
                           >
                             <div className="w-10 h-14 shrink-0 bg-zinc-900 border border-zinc-800 overflow-hidden">
-                              <img
-                                src={
-                                  movie.Poster !== "N/A"
-                                    ? movie.Poster
-                                    : "https://via.placeholder.com/100x150"
-                                }
+                              <MovieImage
+                                src={movie.Poster}
                                 alt={movie.Title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
@@ -374,12 +385,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           className="w-full flex items-center gap-4 p-3 hover:bg-zinc-800/50 transition-colors text-left border-b border-zinc-900/50 last:border-0"
                         >
                           <div className="w-10 h-14 shrink-0 bg-zinc-900 border border-zinc-800 overflow-hidden">
-                            <img
-                              src={
-                                movie.Poster !== "N/A"
-                                  ? movie.Poster
-                                  : "https://via.placeholder.com/100x150"
-                              }
+                            <MovieImage
+                              src={movie.Poster}
                               alt={movie.Title}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
@@ -412,7 +419,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </header>
 
         {/* Dynamic Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
+        <div ref={contentRef} className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
       </main>
     </div>
   );

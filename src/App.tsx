@@ -10,6 +10,8 @@ import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
 import MovieDetailPage from "./pages/MovieDetailPage";
 import LibraryPage from "./pages/LibraryPage";
+import SettingsPage from "./pages/SettingsPage";
+import ReviewsPage from "./pages/ReviewsPage";
 
 import { LanguageProvider } from "./context/LanguageContext";
 
@@ -24,6 +26,8 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/movie/:id" element={<MovieDetailPage />} />
                 <Route path="/library" element={<LibraryPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
               </Routes>
             </Layout>
           </Router>

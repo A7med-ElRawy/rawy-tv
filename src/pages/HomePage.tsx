@@ -104,6 +104,7 @@ const HomePage: React.FC = () => {
 
   const handlePageChange = (newPage: number) => {
     setSearchParams({ q: query, page: newPage.toString() });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
