@@ -337,6 +337,15 @@ export const getUserRecentlyViewed = async (uid: string): Promise<MovieData[]> =
   return userSnap.data().recentlyViewed || [];
 };
 
+export interface ReviewComment {
+  id: string;
+  uid: string;
+  displayName: string | null;
+  photoURL: string | null;
+  text: string;
+  createdAt: string;
+}
+
 export interface ReviewData {
   id: string;
   uid: string;
@@ -349,11 +358,14 @@ export interface ReviewData {
   movieType: string;
   rating: number;
   comment: string;
+  privacy?: "public" | "friends" | "private";
+  likes?: string[];
+  comments?: ReviewComment[];
   publishedAt: any;
 }
 
 /**
- * Publish a movie review in Firestore
+ * Publish a movie review in Firestore, preserving existing likes/comments
  */
 export const publishMovieReview = async (
   uid: string,
@@ -364,6 +376,11 @@ export const publishMovieReview = async (
   privacy: "public" | "friends" | "private" = "public",
 ): Promise<void> => {
   const reviewRef = doc(db, "reviews", `${uid}_${movieData.imdbID}`);
+  const reviewSnap = await getDoc(reviewRef);
+
+  const existingLikes = reviewSnap.exists() ? (reviewSnap.data().likes || []) : [];
+  const existingComments = reviewSnap.exists() ? (reviewSnap.data().comments || []) : [];
+
   await setDoc(reviewRef, {
     id: `${uid}_${movieData.imdbID}`,
     uid,
@@ -377,7 +394,62 @@ export const publishMovieReview = async (
     rating,
     comment,
     privacy,
+    likes: existingLikes,
+    comments: existingComments,
     publishedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Toggle like on a review (add/remove user ID)
+ */
+export const toggleLikeReview = async (reviewId: string, uid: string): Promise<void> => {
+  const reviewRef = doc(db, "reviews", reviewId);
+  const snap = await getDoc(reviewRef);
+  if (!snap.exists()) return;
+  const likes = snap.data().likes || [];
+  const hasLiked = likes.includes(uid);
+  if (hasLiked) {
+    await updateDoc(reviewRef, {
+      likes: arrayRemove(uid)
+    });
+  } else {
+    await updateDoc(reviewRef, {
+      likes: arrayUnion(uid)
+    });
+  }
+};
+
+/**
+ * Append a comment to a review
+ */
+export const addCommentToReview = async (
+  reviewId: string,
+  commentData: ReviewComment
+): Promise<void> => {
+  const reviewRef = doc(db, "reviews", reviewId);
+  await updateDoc(reviewRef, {
+    comments: arrayUnion(commentData)
+  });
+};
+
+/**
+ * Get all public reviews for the Facebook-style social feed
+ */
+export const getAllPublicReviews = async (): Promise<ReviewData[]> => {
+  const reviewsCol = collection(db, "reviews");
+  const q = query(reviewsCol, where("privacy", "==", "public"));
+  const snap = await getDocs(q);
+  const reviews: ReviewData[] = [];
+  snap.forEach((doc) => {
+    reviews.push(doc.data() as ReviewData);
+  });
+
+  // Sort by publishedAt desc
+  return reviews.sort((a, b) => {
+    const timeA = a.publishedAt?.seconds || 0;
+    const timeB = b.publishedAt?.seconds || 0;
+    return timeB - timeA;
   });
 };
 

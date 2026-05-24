@@ -1,224 +1,484 @@
 import React, { useState, useEffect } from "react";
-import { MessageSquare, Star, Trash2, Loader2, ArrowLeft, LogIn } from "lucide-react";
+import { MessageSquare, Star, Trash2, Loader2, ArrowLeft, LogIn, Heart, Send, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { getUserReviews, deleteMovieReview, ReviewData } from "../utils/firebaseUtils";
+import {
+  getUserReviews,
+  getAllPublicReviews,
+  toggleLikeReview,
+  addCommentToReview,
+  deleteMovieReview,
+  ReviewData,
+  ReviewComment
+} from "../utils/firebaseUtils";
 import MovieImage from "../components/MovieImage";
 
 const ReviewsPage: React.FC = () => {
   const { t, language } = useLanguage();
-  const { user, loginWithGoogle } = useAuth();
+  const { user, userProfile, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
+  const [activeTab, setActiveTab] = useState<"feed" | "myReviews">("feed");
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Local state to manage expanded comments drawers by review ID
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [newComments, setNewComments] = useState<Record<string, string>>({});
 
   const fetchReviews = async () => {
-    if (!user) return;
     setLoading(true);
     try {
-      const data = await getUserReviews(user.uid);
-      setReviews(data);
+      if (activeTab === "feed") {
+        const data = await getAllPublicReviews();
+        setReviews(data);
+      } else if (user) {
+        const data = await getUserReviews(user.uid);
+        setReviews(data);
+      }
     } catch (err) {
-      console.error("Error fetching user reviews:", err);
+      console.error("Error fetching reviews:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      fetchReviews();
-    } else {
-      setLoading(false);
+    fetchReviews();
+  }, [activeTab, user]);
+
+  const handleLike = async (reviewId: string) => {
+    if (!user) {
+      alert(t("mustBeLoggedIn"));
+      return;
     }
-  }, [user]);
+
+    try {
+      // Optimistic update
+      setReviews((prev) =>
+        prev.map((rev) => {
+          if (rev.id === reviewId) {
+            const likes = rev.likes || [];
+            const hasLiked = likes.includes(user.uid);
+            const newLikes = hasLiked
+              ? likes.filter((uid) => uid !== user.uid)
+              : [...likes, user.uid];
+            return { ...rev, likes: newLikes };
+          }
+          return rev;
+        })
+      );
+
+      await toggleLikeReview(reviewId, user.uid);
+    } catch (err) {
+      console.error("Error toggling like:", err);
+      // refetch to restore correct state on error
+      fetchReviews();
+    }
+  };
+
+  const handleCommentSubmit = async (e: React.FormEvent, reviewId: string) => {
+    e.preventDefault();
+    if (!user) {
+      alert(t("mustBeLoggedIn"));
+      return;
+    }
+
+    const text = newComments[reviewId]?.trim();
+    if (!text) return;
+
+    const commentData: ReviewComment = {
+      id: `${user.uid}_${Date.now()}`,
+      uid: user.uid,
+      displayName: userProfile?.displayName || user.displayName || "User",
+      photoURL: userProfile?.photoURL || user.photoURL || "",
+      text,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      // Optimistic update
+      setReviews((prev) =>
+        prev.map((rev) => {
+          if (rev.id === reviewId) {
+            const comments = rev.comments || [];
+            return { ...rev, comments: [...comments, commentData] };
+          }
+          return rev;
+        })
+      );
+      
+      // Clear input
+      setNewComments((prev) => ({ ...prev, [reviewId]: "" }));
+
+      await addCommentToReview(reviewId, commentData);
+    } catch (err) {
+      console.error("Error adding comment:", err);
+      fetchReviews();
+    }
+  };
 
   const handleDelete = async (imdbID: string) => {
     if (!user) return;
     try {
       await deleteMovieReview(user.uid, imdbID);
-      // Update local state optimistically
       setReviews((prev) => prev.filter((r) => r.imdbID !== imdbID));
     } catch (err) {
       console.error("Error deleting review:", err);
     }
   };
 
+  const toggleCommentsDrawer = (reviewId: string) => {
+    setExpandedComments((prev) => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
+  };
+
+  const handleCommentChange = (reviewId: string, val: string) => {
+    setNewComments((prev) => ({
+      ...prev,
+      [reviewId]: val
+    }));
+  };
+
   const isRTL = language === "ar";
-
-  if (!user) {
-    return (
-      <div className="p-6 lg:p-10 pb-32 flex flex-col items-center justify-center min-h-[70vh]">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-zinc-900/40 border border-zinc-800 p-8 text-center backdrop-blur-xl relative"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-brand" />
-          
-          <div className="w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <MessageSquare className="w-8 h-8 text-zinc-500" />
-          </div>
-          
-          <h2 className="text-xl font-black mb-3 tracking-wider uppercase text-white">
-            {t("reviews")}
-          </h2>
-          
-          <p className="text-xs text-zinc-400 mb-8 leading-relaxed">
-            {t("mustBeLoggedIn")}
-          </p>
-
-          <button
-            onClick={loginWithGoogle}
-            className="w-full flex items-center justify-center gap-2 bg-brand text-black px-6 py-3.5 font-black uppercase text-[10px] tracking-[2px] hover:bg-white transition-all active:scale-95 cursor-pointer"
-          >
-            <LogIn className="w-4 h-4" /> {t("loginWithGoogle")}
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
+  const isFeed = activeTab === "feed";
 
   return (
     <div className={`p-6 lg:p-10 pb-32 ${isRTL ? "text-right" : "text-left"}`}>
-      {/* Page Header */}
-      <div className="mb-12 border-b border-zinc-900 pb-8">
-        <h1 className="text-5xl lg:text-7xl font-black mb-2 leading-none">
-          {t("reviews")}
-        </h1>
-        <p className="text-zinc-500 font-black text-[10px] uppercase tracking-[4px]">
-          {t("writtenOn")} {user.displayName || "User"}
-        </p>
+      {/* Page Header & Tabs */}
+      <div className="mb-12 border-b border-zinc-900 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h1 className="text-5xl lg:text-7xl font-black mb-2 leading-none flex items-center gap-3">
+            {t("reviews")}
+            {isFeed && <Sparkles className="w-8 h-8 text-brand animate-pulse" />}
+          </h1>
+          <p className="text-zinc-500 font-black text-[10px] uppercase tracking-[4px]">
+            {isFeed ? "Cinematic Social Feed" : `Critiques Portfolio of ${user?.displayName || "User"}`}
+          </p>
+        </div>
+
+        {/* Feed vs My Portfolio Tab Selection */}
+        <div className="flex bg-zinc-900/50 p-1 border border-white/5 rounded-none self-start">
+          <button
+            onClick={() => setActiveTab("feed")}
+            className={`px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer ${
+              isFeed ? "bg-white text-black" : "text-zinc-500 hover:text-white"
+            }`}
+          >
+            {isRTL ? "المجتمع" : "Social Feed"}
+          </button>
+          {user && (
+            <button
+              onClick={() => setActiveTab("myReviews")}
+              className={`px-8 py-3 rounded-none font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer ${
+                !isFeed ? "bg-white text-black" : "text-zinc-500 hover:text-white"
+              }`}
+            >
+              {isRTL ? "مراجعاتي" : "My Reviews"}
+            </button>
+          )}
+        </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center py-32"
-          >
-            <Loader2 className="w-12 h-12 text-zinc-300 animate-spin mb-4" />
-            <p className="text-zinc-500 font-medium">{t("updatingCollections")}</p>
-          </motion.div>
-        ) : reviews.length === 0 ? (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col items-center justify-center py-32 text-center"
-          >
-            <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-zinc-800">
-              <MessageSquare className="w-10 h-10 text-zinc-800" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">{t("noReviews")}</h2>
-            <p className="text-zinc-500 max-w-sm mb-8 text-xs leading-relaxed uppercase tracking-widest font-black opacity-60">
-              {t("noReviewsDesc")}
-            </p>
+      {/* Guest Locked Panel (Only if My Reviews selected while logged out) */}
+      {!user && !isFeed && (
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="max-w-md w-full bg-zinc-900/40 border border-zinc-800 p-8 text-center backdrop-blur-xl">
+            <h2 className="text-xl font-black mb-3 tracking-wider uppercase text-white">{t("reviews")}</h2>
+            <p className="text-xs text-zinc-400 mb-8 leading-relaxed">{t("mustBeLoggedIn")}</p>
             <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 px-8 py-3.5 bg-white text-black font-black uppercase text-[10px] tracking-[2px] hover:bg-zinc-200 transition-all cursor-pointer"
+              onClick={loginWithGoogle}
+              className="w-full flex items-center justify-center gap-2 bg-brand text-black px-6 py-3.5 font-black uppercase text-[10px] tracking-[2px] hover:bg-white transition-all active:scale-95 cursor-pointer"
             >
-              <ArrowLeft className="w-4 h-4 shrink-0" />
-              <span>{t("return")}</span>
+              <LogIn className="w-4 h-4" /> {t("loginWithGoogle")}
             </button>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-6 max-w-4xl"
-          >
-            <AnimatePresence>
-              {reviews.map((review) => (
-                <motion.div
-                  key={review.id}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-zinc-900/30 border border-zinc-800/40 p-6 lg:p-8 flex flex-col md:flex-row gap-6 relative group"
-                >
-                  {/* Movie Poster thumbnail */}
-                  <Link
-                    to={`/movie/${review.imdbID}?type=${review.movieType}`}
-                    className="w-24 aspect-[2/3] shrink-0 bg-zinc-950 border border-white/5 overflow-hidden block"
-                  >
-                    <MovieImage
-                      src={review.moviePoster}
-                      alt={review.movieTitle}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </Link>
+          </div>
+        </div>
+      )}
 
-                  {/* Review Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
-                      <div>
+      {/* Reviews feed mapping */}
+      {(user || isFeed) && (
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-32"
+            >
+              <Loader2 className="w-12 h-12 text-zinc-300 animate-spin mb-4" />
+              <p className="text-zinc-500 font-medium">{t("updatingCollections")}</p>
+            </motion.div>
+          ) : reviews.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex flex-col items-center justify-center py-32 text-center"
+            >
+              <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-6 border border-zinc-800">
+                <MessageSquare className="w-10 h-10 text-zinc-800" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">{t("noReviews")}</h2>
+              <p className="text-zinc-500 max-w-sm mb-8 text-xs leading-relaxed uppercase tracking-widest font-black opacity-60">
+                {t("noReviewsDesc")}
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center gap-2 px-8 py-3.5 bg-white text-black font-black uppercase text-[10px] tracking-[2px] hover:bg-zinc-200 transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>{t("return")}</span>
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-8 max-w-4xl"
+            >
+              <AnimatePresence>
+                {reviews.map((review) => {
+                  const isOwn = review.uid === user?.uid;
+                  const likesCount = review.likes?.length || 0;
+                  const commentsCount = review.comments?.length || 0;
+                  const userHasLiked = user ? (review.likes?.includes(user.uid) || false) : false;
+                  const isDrawerOpen = expandedComments[review.id] || false;
+
+                  const getInitials = (n: string | null) => {
+                    if (!n) return "U";
+                    return n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                  };
+
+                  return (
+                    <motion.div
+                      key={review.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-zinc-900/30 border border-zinc-800/40 p-6 lg:p-8 flex flex-col gap-6 relative"
+                    >
+                      {/* Top Header: Critic Info & rating */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {review.photoURL ? (
+                            <img
+                              src={review.photoURL}
+                              alt="critic-avatar"
+                              className="w-10 h-10 rounded-full object-cover border border-zinc-850"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = "none";
+                                const parent = (e.target as HTMLImageElement).parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `<div class="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-850"><span class="text-xs font-black text-brand">${getInitials(review.displayName)}</span></div>`;
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-850">
+                              <span className="text-xs font-black text-brand">
+                                {getInitials(review.displayName)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                              {review.displayName || "User"}
+                              {isOwn && (
+                                <span className="text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight">
+                                  YOU
+                                </span>
+                              )}
+                            </h4>
+                            {review.publishedAt && (
+                              <p className="text-[8px] font-bold text-zinc-650 uppercase tracking-wider">
+                                {new Date(review.publishedAt.seconds * 1000).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Display Rating Stars */}
+                        <div className="flex items-center gap-1 bg-black/30 px-3 py-1 border border-zinc-800">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-3.5 h-3.5 ${
+                                star <= review.rating
+                                  ? "text-yellow-500 fill-current"
+                                  : "text-zinc-800"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Middle Body: Poster thumbnail & Critique Comment */}
+                      <div className="flex flex-col sm:flex-row gap-6 items-start">
                         <Link
                           to={`/movie/${review.imdbID}?type=${review.movieType}`}
-                          className="hover:text-brand transition-colors"
+                          className="w-24 aspect-[2/3] shrink-0 bg-zinc-950 border border-white/5 overflow-hidden block"
                         >
-                          <h3 className="text-lg font-black uppercase tracking-tight">
-                            {review.movieTitle}
-                          </h3>
-                        </Link>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase">
-                          {review.movieYear} • {review.movieType}
-                        </p>
-                      </div>
-
-                      {/* Display Rating Stars */}
-                      <div className="flex items-center gap-1 bg-black/30 px-3 py-1 border border-zinc-800">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`w-3.5 h-3.5 ${
-                              star <= review.rating
-                                ? "text-yellow-500 fill-current"
-                                : "text-zinc-800"
-                            }`}
+                          <MovieImage
+                            src={review.moviePoster}
+                            alt={review.movieTitle}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
-                        ))}
-                        <span className="ml-2 text-[10px] font-black text-yellow-500">
-                          {review.rating.toFixed(1)}/5.0
-                        </span>
+                        </Link>
+
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            to={`/movie/${review.imdbID}?type=${review.movieType}`}
+                            className="hover:text-brand transition-colors"
+                          >
+                            <h3 className="text-xl font-black uppercase tracking-tight mb-1 leading-none">
+                              {review.movieTitle}
+                            </h3>
+                          </Link>
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase mb-4">
+                            {review.movieYear} • {review.movieType}
+                          </p>
+
+                          <p className="text-zinc-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                            "{review.comment}"
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Review text */}
-                    <p className="text-zinc-300 text-sm font-medium leading-relaxed mb-4 whitespace-pre-wrap">
-                      "{review.comment}"
-                    </p>
+                      {/* Bottom Interaction Footer: Likes & Comments count */}
+                      <div className="flex items-center gap-6 pt-4 border-t border-zinc-850/60 mt-2">
+                        {/* Like Button */}
+                        <button
+                          onClick={() => handleLike(review.id)}
+                          className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+                            userHasLiked ? "text-brand" : "text-zinc-500 hover:text-white"
+                          }`}
+                        >
+                          <Heart className={`w-4 h-4 ${userHasLiked ? "fill-current" : ""}`} />
+                          <span>
+                            {likesCount} {language === "ar" ? "إعجاب" : "Likes"}
+                          </span>
+                        </button>
 
-                    {/* Footer / Date */}
-                    {review.publishedAt && (
-                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">
-                        {new Date(review.publishedAt.seconds * 1000).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                        {/* Expand Comments Button */}
+                        <button
+                          onClick={() => toggleCommentsDrawer(review.id)}
+                          className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+                            isDrawerOpen ? "text-white" : "text-zinc-500 hover:text-white"
+                          }`}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>
+                            {commentsCount} {language === "ar" ? "تعليق" : "Comments"}
+                          </span>
+                        </button>
 
-                  {/* Delete Button (Retract Review) */}
-                  <button
-                    onClick={() => handleDelete(review.imdbID)}
-                    className="absolute top-6 right-6 md:static self-start p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer rounded-none"
-                    title="Delete Review"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                        {/* Personal Delete Review Button */}
+                        {isOwn && (
+                          <button
+                            onClick={() => handleDelete(review.imdbID)}
+                            className="ml-auto p-1.5 text-zinc-650 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
+                            title="Delete Critique"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Social Facebook-style Comments Drawer */}
+                      <AnimatePresence>
+                        {isDrawerOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden bg-black/20 border-t border-zinc-850/60 pt-4 mt-2 space-y-4"
+                          >
+                            {/* Existing Comments List */}
+                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                              {(review.comments || []).map((comm) => (
+                                <div key={comm.id} className="flex items-start gap-2.5 p-3 bg-zinc-900/30 border border-zinc-850/40">
+                                  {comm.photoURL ? (
+                                    <img
+                                      src={comm.photoURL}
+                                      alt="commentator-avatar"
+                                      className="w-7 h-7 rounded-full object-cover border border-zinc-800"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                        const parent = (e.target as HTMLImageElement).parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = `<div class="w-7 h-7 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-800"><span class="text-[9px] font-black text-brand">${getInitials(comm.displayName)}</span></div>`;
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-7 h-7 rounded-full bg-brand/20 flex items-center justify-center border border-zinc-800">
+                                      <span className="text-[9px] font-black text-brand">
+                                        {getInitials(comm.displayName)}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-wide">
+                                      {comm.displayName || "User"}
+                                    </p>
+                                    <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed font-medium">
+                                      {comm.text}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Write a comment form */}
+                            {user ? (
+                              <form
+                                onSubmit={(e) => handleCommentSubmit(e, review.id)}
+                                className="flex gap-2"
+                              >
+                                <input
+                                  type="text"
+                                  value={newComments[review.id] || ""}
+                                  onChange={(e) => handleCommentChange(review.id, e.target.value)}
+                                  placeholder={language === "ar" ? "أكتب تعليقاً..." : "Write a comment..."}
+                                  className="flex-1 bg-black/40 border border-zinc-800 py-2.5 px-3.5 text-xs text-white focus:outline-none focus:border-brand focus:bg-black/60 transition-all font-medium"
+                                  required
+                                  maxLength={300}
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={!(newComments[review.id] || "").trim()}
+                                  className="bg-brand text-white p-2.5 hover:bg-white hover:text-black transition-colors cursor-pointer disabled:bg-zinc-800 disabled:text-zinc-500"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              </form>
+                            ) : (
+                              <p className="text-[10px] font-black text-zinc-650 uppercase tracking-widest">
+                                {t("mustBeLoggedIn")}
+                              </p>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
     </div>
   );
 };
