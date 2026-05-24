@@ -36,6 +36,7 @@ const MovieDetailPage: React.FC = () => {
     ratings,
     setRating,
     addToRecent,
+    refreshReviewsCount,
   } = useMovies();
 
   const { user, userProfile } = useAuth();
@@ -136,6 +137,7 @@ const MovieDetailPage: React.FC = () => {
         message: t("reviewPublished"),
       });
       fetchCommunityReviews();
+      refreshReviewsCount();
     } catch (err) {
       console.error(err);
       setReviewStatus({
@@ -632,10 +634,18 @@ const MovieDetailPage: React.FC = () => {
                               )}
                               
                               <div>
-                                <p className="text-xs font-black uppercase tracking-wider text-white">
-                                  {rev.displayName || "User"}
+                                <p className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2 flex-wrap">
+                                  <span>{rev.displayName || "User"}</span>
+                                  <span className="text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 font-black tracking-tight uppercase inline-block align-middle shrink-0">
+                                    LVL {rev.userLevel || 1}
+                                  </span>
+                                  {(rev.isAdmin || (isOwn && user?.email === "ahmedrawy108@gmail.com")) && (
+                                    <span className="text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 font-black tracking-widest uppercase inline-block align-middle shrink-0 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.2)]">
+                                      ADMIN
+                                    </span>
+                                  )}
                                   {isOwn && (
-                                    <span className="ml-2 text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight">
+                                    <span className="text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight shrink-0">
                                       YOU
                                     </span>
                                   )}

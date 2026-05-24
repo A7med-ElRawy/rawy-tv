@@ -104,6 +104,25 @@ export const translations = {
     writtenOn: "Written on",
     nameTaken: "This display name is already taken. Please choose another one.",
 
+    // Achievements Page
+    achievements: "Achievements",
+    badgeGallery: "Badge Gallery",
+    badgesUnlocked: "Badges Unlocked",
+    rankTitle: "Critique Rank",
+    xpPoints: "XP Level",
+    achievementUnlocked: "Achievement Unlocked!",
+    congratsBadge: "Congratulations! You have unlocked a new badge:",
+    firstLoveName: "First Love",
+    firstLoveDesc: "Add your first movie to Favorites",
+    criticApprenticeName: "Cinematic Scholar",
+    criticApprenticeDesc: "Write your first movie review",
+    scoreCollectorName: "Rating Master",
+    scoreCollectorDesc: "Rate 5 movies or TV shows",
+    marathonerName: "Movie Marathoner",
+    marathonerDesc: "Add 5 titles to your Watch Later queue",
+    grandCriticName: "Grand Critic",
+    grandCriticDesc: "Publish 5 movie reviews",
+
     // Privacy Settings
     privacySettings: "Critique Privacy",
     showToAll: "Show my reviews to all users",
@@ -214,6 +233,25 @@ export const translations = {
     reviewError: "فشل نشر التقييم. يرجى المحاولة مرة أخرى.",
     writtenOn: "كتب في",
     nameTaken: "هذا الاسم مستخدم بالفعل. يرجى اختيار اسم آخر.",
+
+    // Achievements Page
+    achievements: "الأوسمة",
+    badgeGallery: "معرض الأوسمة والجوائز",
+    badgesUnlocked: "الأوسمة المفتوحة",
+    rankTitle: "رتبة الناقد",
+    xpPoints: "نقاط الخبرة",
+    achievementUnlocked: "تم فتح إنجاز جديد!",
+    congratsBadge: "تهانينا! لقد حصلت على وسام جديد:",
+    firstLoveName: "الحب الأول",
+    firstLoveDesc: "أضف أول فيلم لك إلى المفضلة",
+    criticApprenticeName: "باحث سينمائي",
+    criticApprenticeDesc: "اكتب أول مراجعة سينمائية لك",
+    scoreCollectorName: "سيد التقييم",
+    scoreCollectorDesc: "قّيم 5 أفلام أو مسلسلات",
+    marathonerName: "ماراثون الأفلام",
+    marathonerDesc: "أضف 5 عناوين إلى قائمة المشاهدة لاحقاً",
+    grandCriticName: "الناقد الكبير",
+    grandCriticDesc: "انشر 5 مراجعات سينمائية",
 
     // Privacy Settings
     privacySettings: "خصوصية المراجعات",

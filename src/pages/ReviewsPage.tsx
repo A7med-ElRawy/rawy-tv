@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useMovies } from "../context/MovieContext";
 import {
   getUserReviews,
   getAllPublicReviews,
@@ -18,6 +19,7 @@ import MovieImage from "../components/MovieImage";
 const ReviewsPage: React.FC = () => {
   const { t, language } = useLanguage();
   const { user, userProfile, loginWithGoogle } = useAuth();
+  const { refreshReviewsCount } = useMovies();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"feed" | "myReviews">("feed");
@@ -125,6 +127,7 @@ const ReviewsPage: React.FC = () => {
     try {
       await deleteMovieReview(user.uid, imdbID);
       setReviews((prev) => prev.filter((r) => r.imdbID !== imdbID));
+      refreshReviewsCount();
     } catch (err) {
       console.error("Error deleting review:", err);
     }
@@ -289,10 +292,18 @@ const ReviewsPage: React.FC = () => {
                           )}
 
                           <div>
-                            <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
-                              {review.displayName || "User"}
+                            <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2 flex-wrap">
+                              <span>{review.displayName || "User"}</span>
+                              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 font-black tracking-tight uppercase inline-block align-middle shrink-0">
+                                LVL {review.userLevel || 1}
+                              </span>
+                              {(review.isAdmin || (isOwn && user?.email === "ahmedrawy108@gmail.com")) && (
+                                <span className="text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 font-black tracking-widest uppercase inline-block align-middle shrink-0 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.2)]">
+                                  ADMIN
+                                </span>
+                              )}
                               {isOwn && (
-                                <span className="text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight">
+                                <span className="text-[8px] bg-brand text-black px-1.5 py-0.5 font-bold uppercase tracking-tight shrink-0">
                                   YOU
                                 </span>
                               )}

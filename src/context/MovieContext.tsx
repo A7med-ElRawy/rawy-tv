@@ -9,7 +9,9 @@ import {
   getUserRatings,
   getUserRecentlyViewed,
   addToRecentlyViewed,
+  getUserReviews,
   MovieData,
+  updateUserLevel,
 } from "../utils/firebaseUtils";
 
 interface MovieContextType {
@@ -17,10 +19,12 @@ interface MovieContextType {
   watchLater: MovieData[];
   recentlyViewed: MovieData[];
   ratings: Record<string, number>;
+  reviewsCount: number;
   toggleFavorite: (movieData: MovieData) => Promise<void>;
   toggleWatchLater: (movieData: MovieData) => Promise<void>;
   setRating: (id: string, rating: number) => Promise<void>;
   addToRecent: (movieData: MovieData) => Promise<void>;
+  refreshReviewsCount: () => Promise<void>;
   loading: boolean;
 }
 
@@ -34,6 +38,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
   const [watchLater, setWatchLater] = useState<MovieData[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<MovieData[]>([]);
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [reviewsCount, setReviewsCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   // Fetch user data from Firestore when user changes
@@ -43,23 +48,26 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
       setWatchLater([]);
       setRatings({});
       setRecentlyViewed([]);
+      setReviewsCount(0);
       return;
     }
 
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const [favs, watchLaterMovies, userRatings, recentMovies] = await Promise.all([
+        const [favs, watchLaterMovies, userRatings, recentMovies, userReviews] = await Promise.all([
           getUserFavorites(user.uid),
           getUserWatchLater(user.uid),
           getUserRatings(user.uid),
           getUserRecentlyViewed(user.uid),
+          getUserReviews(user.uid),
         ]);
 
         setFavorites(favs);
         setWatchLater(watchLaterMovies);
         setRatings(userRatings);
         setRecentlyViewed(recentMovies);
+        setReviewsCount(userReviews.length);
       } catch (error) {
         console.error("Error fetching user data from Firestore:", error);
       } finally {
@@ -69,6 +77,57 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
 
     fetchUserData();
   }, [user]);
+
+  // Synchronize calculated user level in Firestore when profile metrics change
+  useEffect(() => {
+    if (!user || loading) return;
+
+    const favsCount = favorites.length;
+    const wlCount = watchLater.length;
+    const rCount = Object.keys(ratings).length;
+
+    // Calculate level
+    const ACHIEVEMENTS_LIST = [
+      { goalType: "favorites", goalValue: 1 },
+      { goalType: "reviews", goalValue: 1 },
+      { goalType: "ratings", goalValue: 5 },
+      { goalType: "watchLater", goalValue: 5 },
+      { goalType: "reviews", goalValue: 5 },
+    ];
+
+    const getProgress = (type: string): number => {
+      switch (type) {
+        case "favorites":
+          return favsCount;
+        case "reviews":
+          return reviewsCount;
+        case "ratings":
+          return rCount;
+        case "watchLater":
+          return wlCount;
+        default:
+          return 0;
+      }
+    };
+
+    const unlockedCount = ACHIEVEMENTS_LIST.filter((badge) => {
+      return getProgress(badge.goalType) >= badge.goalValue;
+    }).length;
+
+    const badgeXp = unlockedCount * 100;
+    const activityXp =
+      favsCount * 10 +
+      reviewsCount * 20 +
+      rCount * 5 +
+      wlCount * 5;
+    const totalXp = badgeXp + activityXp;
+    const calculatedLevel = Math.floor(totalXp / 500) + 1;
+
+    // Sync to Firestore in the background
+    updateUserLevel(user.uid, calculatedLevel).catch((err) => {
+      console.error("Failed to sync user level in Firestore:", err);
+    });
+  }, [user, loading, favorites.length, watchLater.length, ratings, reviewsCount]);
 
   const handleToggleFavorite = async (movieData: MovieData) => {
     if (!user) {
@@ -152,6 +211,16 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [user]);
 
+  const handleRefreshReviewsCount = async () => {
+    if (!user) return;
+    try {
+      const data = await getUserReviews(user.uid);
+      setReviewsCount(data.length);
+    } catch (err) {
+      console.error("Error refreshing reviews count:", err);
+    }
+  };
+
   return (
     <MovieContext.Provider
       value={{
@@ -159,10 +228,12 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({
         watchLater,
         recentlyViewed,
         ratings,
+        reviewsCount,
         toggleFavorite: handleToggleFavorite,
         toggleWatchLater: handleToggleWatchLater,
         setRating: handleSetRating,
         addToRecent: handleAddToRecent,
+        refreshReviewsCount: handleRefreshReviewsCount,
         loading,
       }}
     >

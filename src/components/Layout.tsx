@@ -11,17 +11,142 @@ import {
   PlayCircle,
   Settings,
   MessageSquare,
+  Trophy,
+  Heart,
+  Star,
+  Zap,
+  Award,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { movieService, Movie } from "../services/movieService";
 import NavBar from "./NavBar";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
+import { useMovies } from "../context/MovieContext";
 import MovieImage from "./MovieImage";
 
 
+const ACHIEVEMENTS_LIST = [
+  {
+    id: "first-love",
+    nameKey: "firstLoveName",
+    descKey: "firstLoveDesc",
+    icon: Heart,
+    color: "from-rose-500 to-pink-600 shadow-[0_0_15px_rgba(244,63,94,0.4)]",
+    goalType: "favorites" as const,
+    goalValue: 1
+  },
+  {
+    id: "critic-apprentice",
+    nameKey: "criticApprenticeName",
+    descKey: "criticApprenticeDesc",
+    icon: MessageSquare,
+    color: "from-brand to-red-650 shadow-[0_0_15px_rgba(229,9,20,0.4)]",
+    goalType: "reviews" as const,
+    goalValue: 1
+  },
+  {
+    id: "score-collector",
+    nameKey: "scoreCollectorName",
+    descKey: "scoreCollectorDesc",
+    icon: Star,
+    color: "from-amber-400 to-yellow-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]",
+    goalType: "ratings" as const,
+    goalValue: 5
+  },
+  {
+    id: "marathoner",
+    nameKey: "marathonerName",
+    descKey: "marathonerDesc",
+    icon: Zap,
+    color: "from-cyan-400 to-blue-500 shadow-[0_0_15px_rgba(34,211,238,0.4)]",
+    goalType: "watchLater" as const,
+    goalValue: 5
+  },
+  {
+    id: "grand-critic",
+    nameKey: "grandCriticName",
+    descKey: "grandCriticDesc",
+    icon: Award,
+    color: "from-emerald-400 to-teal-500 shadow-[0_0_15px_rgba(52,211,153,0.4)]",
+    goalType: "reviews" as const,
+    goalValue: 5
+  }
+];
+
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const { favorites, watchLater, ratings, reviewsCount, loading } = useMovies();
+  
+  const [activeNotification, setActiveNotification] = useState<{
+    id: string;
+    nameKey: string;
+    descKey: string;
+    icon: React.ComponentType<any>;
+    color: string;
+  } | null>(null);
+
   const location = useLocation();
+
+  useEffect(() => {
+    if (!user || loading) return;
+
+    const notifiedKey = `notified_badges_${user.uid}`;
+    const stored = localStorage.getItem(notifiedKey);
+
+    const ratingsCount = Object.keys(ratings).length;
+
+    const getProgress = (type: string): number => {
+      switch (type) {
+        case "favorites":
+          return favorites.length;
+        case "reviews":
+          return reviewsCount;
+        case "ratings":
+          return ratingsCount;
+        case "watchLater":
+          return watchLater.length;
+        default:
+          return 0;
+      }
+    };
+
+    // Find all currently unlocked badges
+    const currentUnlocked = ACHIEVEMENTS_LIST.filter((badge) => {
+      const progress = getProgress(badge.goalType);
+      return progress >= badge.goalValue;
+    });
+
+    const currentUnlockedIds = currentUnlocked.map((badge) => badge.id);
+
+    if (stored === null) {
+      // First time initialization for this user: store all their currently unlocked badges without triggering a popup
+      localStorage.setItem(notifiedKey, JSON.stringify(currentUnlockedIds));
+    } else {
+      // Notified key exists. Check if there are any newly unlocked badges
+      let notifiedBadges: string[] = [];
+      try {
+        notifiedBadges = JSON.parse(stored);
+      } catch (e) {
+        console.error("Failed to parse notified badges:", e);
+      }
+
+      // Find the first badge that is currently unlocked but not in the notified list
+      const newUnlocked = currentUnlocked.find(
+        (badge) => !notifiedBadges.includes(badge.id)
+      );
+
+      if (newUnlocked) {
+        // Trigger notification
+        setActiveNotification(newUnlocked);
+
+        // Update stored list
+        const updatedNotified = [...notifiedBadges, newUnlocked.id];
+        localStorage.setItem(notifiedKey, JSON.stringify(updatedNotified));
+      }
+    }
+  }, [user, loading, favorites.length, watchLater.length, ratings, reviewsCount]);
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -97,6 +222,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: t("home"), path: "/", icon: Home },
     { name: t("library"), path: "/library", icon: Bookmark },
     { name: t("reviews"), path: "/reviews", icon: MessageSquare },
+    { name: t("achievements"), path: "/achievements", icon: Trophy },
     { name: t("settings"), path: "/settings", icon: Settings },
   ];
 
@@ -421,6 +547,78 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Dynamic Content */}
         <div ref={contentRef} className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
       </main>
+
+      {/* Achievement Unlocked Popup */}
+      <AnimatePresence>
+        {activeNotification && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[999] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: -20, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="max-w-md w-full bg-zinc-900 border-2 border-brand/40 p-8 text-center relative overflow-hidden shadow-[0_0_50px_rgba(229,9,20,0.4)]"
+            >
+              {/* Decorative premium corner borders */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-brand" />
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-brand" />
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-brand" />
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-brand" />
+              
+              {/* Animated glow ray behind icon */}
+              <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-brand/10 rounded-full blur-[60px] animate-pulse pointer-events-none" />
+
+              {/* Glowing Icon */}
+              <div className="relative mb-6 flex justify-center">
+                <motion.div
+                  animate={{ rotate: [0, 5, -5, 0] }}
+                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                  className={`w-20 h-20 rounded-full bg-gradient-to-tr ${activeNotification.color} flex items-center justify-center border border-white/10 relative z-10 shadow-2xl`}
+                >
+                  {React.createElement(activeNotification.icon, {
+                    className: "w-10 h-10 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+                  })}
+                </motion.div>
+                
+                {/* Ring animation */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full border border-brand/35 animate-ping opacity-60" />
+                </div>
+              </div>
+
+              {/* Title & Badge Details */}
+              <h2 className="text-xl font-black text-brand tracking-widest uppercase mb-2">
+                {t("achievementUnlocked")}
+              </h2>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-6">
+                {t("congratsBadge")}
+              </p>
+
+              <div className="bg-zinc-950/60 border border-zinc-800 p-4 mb-8">
+                <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
+                  {t(activeNotification.nameKey)}
+                </h3>
+                <p className="text-[10px] text-zinc-400 leading-relaxed font-semibold">
+                  {t(activeNotification.descKey)}
+                </p>
+              </div>
+
+              {/* Close Action */}
+              <button
+                onClick={() => setActiveNotification(null)}
+                className="w-full bg-brand text-black font-black uppercase text-[10px] tracking-[2px] py-3.5 hover:bg-white transition-all cursor-pointer shadow-[0_0_15px_rgba(229,9,20,0.3)] active:scale-95"
+              >
+                {language === "ar" ? "رائع!" : "AWESOME!"}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

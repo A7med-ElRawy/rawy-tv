@@ -385,6 +385,8 @@ export interface ReviewData {
   uid: string;
   displayName: string | null;
   photoURL: string | null;
+  userLevel?: number;
+  isAdmin?: boolean;
   imdbID: string;
   movieTitle: string;
   moviePoster: string;
@@ -397,6 +399,34 @@ export interface ReviewData {
   comments?: ReviewComment[];
   publishedAt: any;
 }
+
+/**
+ * Update the user's level in Firestore and synchronize it on all their reviews
+ */
+export const updateUserLevel = async (
+  uid: string,
+  level: number
+): Promise<void> => {
+  // Update in user profile
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const email = userSnap.exists() ? (userSnap.data().email || "") : "";
+  const isAdmin = email === "ahmedrawy108@gmail.com";
+
+  await updateDoc(userRef, { level, isAdmin });
+
+  // Update in all their past reviews
+  const reviewsCol = collection(db, "reviews");
+  const q = query(reviewsCol, where("uid", "==", uid));
+  const snap = await getDocs(q);
+  const promises = snap.docs.map((docSnap) => {
+    return updateDoc(docSnap.ref, { 
+      userLevel: level,
+      isAdmin: isAdmin
+    });
+  });
+  await Promise.all(promises);
+};
 
 /**
  * Publish a movie review in Firestore, preserving existing likes/comments
@@ -420,6 +450,8 @@ export const publishMovieReview = async (
     uid,
     displayName: userProfile?.displayName || "User",
     photoURL: userProfile?.photoURL || "",
+    userLevel: userProfile?.level || 1,
+    isAdmin: userProfile?.email === "ahmedrawy108@gmail.com" || false,
     imdbID: movieData.imdbID,
     movieTitle: movieData.Title,
     moviePoster: movieData.Poster,
