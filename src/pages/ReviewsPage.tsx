@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MessageSquare, Star, Trash2, Loader2, ArrowLeft, LogIn, Heart, Send, Sparkles } from "lucide-react";
+import { MessageSquare, Star, Trash2, Edit, Loader2, ArrowLeft, LogIn, Heart, Send, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +11,9 @@ import {
   toggleLikeReview,
   addCommentToReview,
   deleteMovieReview,
+  editCommentInReview,
+  deleteCommentFromReview,
+  updateMovieReview,
   ReviewData,
   ReviewComment
 } from "../utils/firebaseUtils";
@@ -21,6 +24,7 @@ const ReviewsPage: React.FC = () => {
   const { user, userProfile, loginWithGoogle } = useAuth();
   const { refreshReviewsCount } = useMovies();
   const navigate = useNavigate();
+  const isAdminUser = userProfile?.isAdmin || user?.email === "ahmedrawy108@gmail.com";
 
   const [activeTab, setActiveTab] = useState<"feed" | "myReviews">("feed");
   const [reviews, setReviews] = useState<ReviewData[]>([]);
@@ -29,6 +33,15 @@ const ReviewsPage: React.FC = () => {
   // Local state to manage expanded comments drawers by review ID
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
+
+  // Review Editing State
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editReviewText, setEditReviewText] = useState("");
+  const [editReviewRating, setEditReviewRating] = useState(5);
+
+  // Comment Editing State
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState("");
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -122,11 +135,18 @@ const ReviewsPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (imdbID: string) => {
+  const handleDelete = async (authorUid: string, imdbID: string) => {
     if (!user) return;
+    const confirmDelete = window.confirm(
+      language === "ar"
+        ? "هل أنت متأكد من حذف هذه المراجعة؟"
+        : "Are you sure you want to delete this review?"
+    );
+    if (!confirmDelete) return;
+
     try {
-      await deleteMovieReview(user.uid, imdbID);
-      setReviews((prev) => prev.filter((r) => r.imdbID !== imdbID));
+      await deleteMovieReview(authorUid, imdbID);
+      setReviews((prev) => prev.filter((r) => r.id !== `${authorUid}_${imdbID}`));
       refreshReviewsCount();
     } catch (err) {
       console.error("Error deleting review:", err);
@@ -146,7 +166,106 @@ const ReviewsPage: React.FC = () => {
       [reviewId]: val
     }));
   };
+  const startEditReview = (review: ReviewData) => {
+    setEditingReviewId(review.id);
+    setEditReviewText(review.comment);
+    setEditReviewRating(review.rating);
+  };
 
+  const cancelEditReview = () => {
+    setEditingReviewId(null);
+    setEditReviewText("");
+    setEditReviewRating(5);
+  };
+
+  const handleSaveReview = async (reviewId: string) => {
+    const text = editReviewText.trim();
+    if (!text) return;
+
+    try {
+      // Optimistic update
+      setReviews((prev) =>
+        prev.map((rev) => {
+          if (rev.id === reviewId) {
+            return { ...rev, comment: text, rating: editReviewRating };
+          }
+          return rev;
+        })
+      );
+      setEditingReviewId(null);
+
+      await updateMovieReview(reviewId, editReviewRating, text);
+    } catch (err) {
+      console.error("Error editing review:", err);
+      fetchReviews();
+    }
+  };
+
+  const startEditComment = (comment: ReviewComment) => {
+    setEditingCommentId(comment.id);
+    setEditCommentText(comment.text);
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentText("");
+  };
+
+  const handleSaveComment = async (reviewId: string, commentId: string) => {
+    const text = editCommentText.trim();
+    if (!text) return;
+
+    try {
+      // Optimistic update
+      setReviews((prev) =>
+        prev.map((rev) => {
+          if (rev.id === reviewId) {
+            const updatedComments = (rev.comments || []).map((c) => {
+              if (c.id === commentId) {
+                return { ...c, text };
+              }
+              return c;
+            });
+            return { ...rev, comments: updatedComments };
+          }
+          return rev;
+        })
+      );
+      setEditingCommentId(null);
+
+      await editCommentInReview(reviewId, commentId, text);
+    } catch (err) {
+      console.error("Error editing comment:", err);
+      fetchReviews();
+    }
+  };
+
+  const handleDeleteComment = async (reviewId: string, commentId: string) => {
+    const confirmDelete = window.confirm(
+      language === "ar"
+        ? "هل أنت متأكد من حذف هذا التعليق؟"
+        : "Are you sure you want to delete this comment?"
+    );
+    if (!confirmDelete) return;
+
+    try {
+      // Optimistic update
+      setReviews((prev) =>
+        prev.map((rev) => {
+          if (rev.id === reviewId) {
+            const filteredComments = (rev.comments || []).filter((c) => c.id !== commentId);
+            return { ...rev, comments: filteredComments };
+          }
+          return rev;
+        })
+      );
+
+      await deleteCommentFromReview(reviewId, commentId);
+    } catch (err) {
+      console.error("Error deleting comment:", err);
+      fetchReviews();
+    }
+  };
   const isRTL = language === "ar";
   const isFeed = activeTab === "feed";
 
@@ -317,22 +436,43 @@ const ReviewsPage: React.FC = () => {
                         </div>
 
                         {/* Display Rating Stars */}
-                        <div className="flex items-center gap-1 bg-black/30 px-3 py-1 border border-zinc-800">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-3.5 h-3.5 ${
-                                star <= review.rating
-                                  ? "text-yellow-500 fill-current"
-                                  : "text-zinc-800"
-                              }`}
-                            />
-                          ))}
-                        </div>
+                        {editingReviewId === review.id ? (
+                          <div className="flex items-center gap-1 bg-black/40 px-3 py-1 border border-brand/50">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                onClick={() => setEditReviewRating(star)}
+                                className="focus:outline-none transition-transform active:scale-90"
+                              >
+                                <Star
+                                  className={`w-3.5 h-3.5 cursor-pointer ${
+                                    star <= editReviewRating
+                                      ? "text-yellow-500 fill-current"
+                                      : "text-zinc-850"
+                                  }`}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 bg-black/30 px-3 py-1 border border-zinc-800">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3.5 h-3.5 ${
+                                  star <= review.rating
+                                    ? "text-yellow-500 fill-current"
+                                    : "text-zinc-800"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Middle Body: Poster thumbnail & Critique Comment */}
-                      <div className="flex flex-col sm:flex-row gap-6 items-start">
+                      <div className="flex flex-col sm:flex-row gap-6 items-start w-full">
                         <Link
                           to={`/movie/${review.imdbID}?type=${review.movieType}`}
                           className="w-24 aspect-[2/3] shrink-0 bg-zinc-950 border border-white/5 overflow-hidden block"
@@ -344,7 +484,7 @@ const ReviewsPage: React.FC = () => {
                           />
                         </Link>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 w-full">
                           <Link
                             to={`/movie/${review.imdbID}?type=${review.movieType}`}
                             className="hover:text-brand transition-colors"
@@ -357,9 +497,38 @@ const ReviewsPage: React.FC = () => {
                             {review.movieYear} • {review.movieType}
                           </p>
 
-                          <p className="text-zinc-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">
-                            "{review.comment}"
-                          </p>
+                          {editingReviewId === review.id ? (
+                            <div className="space-y-4 w-full mt-2">
+                              <textarea
+                                value={editReviewText}
+                                onChange={(e) => setEditReviewText(e.target.value)}
+                                className="w-full bg-black/50 border border-brand/40 p-3.5 text-xs font-medium text-white focus:outline-none focus:border-brand transition-all resize-none tracking-wide"
+                                rows={4}
+                                required
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={cancelEditReview}
+                                  className="px-4 py-2 border border-zinc-800 text-zinc-400 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                                >
+                                  {language === "ar" ? "إلغاء" : "Cancel"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveReview(review.id)}
+                                  disabled={!editReviewText.trim()}
+                                  className="px-4 py-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer disabled:bg-zinc-800 disabled:text-zinc-500"
+                                >
+                                  {language === "ar" ? "حفظ" : "Save"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-zinc-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                              "{review.comment}"
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -391,15 +560,26 @@ const ReviewsPage: React.FC = () => {
                           </span>
                         </button>
 
-                        {/* Personal Delete Review Button */}
-                        {isOwn && (
-                          <button
-                            onClick={() => handleDelete(review.imdbID)}
-                            className="ml-auto p-1.5 text-zinc-650 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
-                            title="Delete Critique"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        {/* Personal Edit & Delete Review Buttons / Admin Delete */}
+                        {(isOwn || isAdminUser) && (
+                          <div className="ml-auto flex items-center gap-1.5">
+                            {isOwn && (
+                              <button
+                                onClick={() => startEditReview(review)}
+                                className="p-1.5 text-zinc-650 hover:text-brand hover:bg-brand/10 transition-all cursor-pointer"
+                                title={language === "ar" ? "تعديل المراجعة" : "Edit Review"}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(review.uid, review.imdbID)}
+                              className="p-1.5 text-zinc-650 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
+                              title={language === "ar" ? "حذف المراجعة" : "Delete Review"}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -438,12 +618,69 @@ const ReviewsPage: React.FC = () => {
                                   )}
 
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black text-white uppercase tracking-wide">
-                                      {comm.displayName || "User"}
-                                    </p>
-                                    <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed font-medium">
-                                      {comm.text}
-                                    </p>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-[10px] font-black text-white uppercase tracking-wide">
+                                        {comm.displayName || "User"}
+                                      </p>
+                                      {/* Show edit/delete options if it's the user's comment or admin */}
+                                      {user && (comm.uid === user.uid || isAdminUser) && (
+                                        <div className="flex items-center gap-2 opacity-65 hover:opacity-100 transition-opacity">
+                                          {comm.uid === user.uid && (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() => startEditComment(comm)}
+                                                className="text-[9px] font-black uppercase text-zinc-500 hover:text-brand transition-colors cursor-pointer"
+                                              >
+                                                {language === "ar" ? "تعديل" : "Edit"}
+                                              </button>
+                                              <span className="text-[8px] text-zinc-700">•</span>
+                                            </>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteComment(review.id, comm.id)}
+                                            className="text-[9px] font-black uppercase text-zinc-500 hover:text-red-500 transition-colors cursor-pointer"
+                                          >
+                                            {language === "ar" ? "حذف" : "Delete"}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {editingCommentId === comm.id ? (
+                                      <div className="mt-2 space-y-2">
+                                        <input
+                                          type="text"
+                                          value={editCommentText}
+                                          onChange={(e) => setEditCommentText(e.target.value)}
+                                          className="w-full bg-black/60 border border-brand/40 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand font-medium rounded-none"
+                                          required
+                                          maxLength={300}
+                                        />
+                                        <div className="flex gap-2 justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditComment}
+                                            className="px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-zinc-500 hover:text-white transition-colors cursor-pointer border border-zinc-800"
+                                          >
+                                            {language === "ar" ? "إلغاء" : "Cancel"}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSaveComment(review.id, comm.id)}
+                                            disabled={!editCommentText.trim()}
+                                            className="px-2.5 py-1 text-[8px] font-black uppercase tracking-wider bg-brand text-white hover:bg-white hover:text-black transition-colors cursor-pointer disabled:bg-zinc-800 disabled:text-zinc-500"
+                                          >
+                                            {language === "ar" ? "حفظ" : "Save"}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed font-medium">
+                                        {comm.text}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               ))}

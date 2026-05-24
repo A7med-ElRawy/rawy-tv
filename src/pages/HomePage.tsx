@@ -126,13 +126,14 @@ const HomePage: React.FC = () => {
             >
               <img
                 src={
-                  (popularMovies[activeSlide] as any).Poster?.replace(
-                    "w500",
-                    "original",
-                  ) || ""
+                  (popularMovies[activeSlide] as any).backdrop_path ||
+                  (popularMovies[activeSlide] as any).Poster?.replace("w500", "original") ||
+                  popularMovies[activeSlide].Poster ||
+                  ""
                 }
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-center"
                 alt="Backdrop"
+                referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-linear-to-r from-surface via-surface/60 to-transparent z-10" />
               <div className="absolute inset-0 bg-linear-to-t from-surface via-transparent to-transparent z-10" />
@@ -154,7 +155,10 @@ const HomePage: React.FC = () => {
                     </span>
                   </div>
 
-                  <h1 className="text-7xl lg:text-[140px] font-black mb-8 leading-[0.8] tracking-[-0.05em] uppercase drop-shadow-2xl">
+                  <h1
+                    className="font-black mb-8 leading-[0.85] tracking-[-0.04em] uppercase drop-shadow-2xl break-words"
+                    style={{ fontSize: "clamp(2.5rem, 6vw, 7rem)" }}
+                  >
                     {popularMovies[activeSlide].Title.split(" ").map(
                       (word, idx) => (
                         <React.Fragment key={idx}>

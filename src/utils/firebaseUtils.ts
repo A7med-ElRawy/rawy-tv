@@ -27,6 +27,8 @@ export interface UserProfile {
   recentlyViewed?: MovieData[];
   lastWatched: MovieData | null;
   ratings: Record<string, number>;
+  friends?: string[];
+  level?: number;
   createdAt: any;
 }
 
@@ -66,6 +68,8 @@ export const initializeUserProfile = async (
       recentlyViewed: [],
       lastWatched: null,
       ratings: {},
+      friends: [],
+      level: 1,
       createdAt: serverTimestamp(),
     });
   } else {
@@ -500,6 +504,62 @@ export const addCommentToReview = async (
 };
 
 /**
+ * Edit a comment in a review
+ */
+export const editCommentInReview = async (
+  reviewId: string,
+  commentId: string,
+  newText: string
+): Promise<void> => {
+  const reviewRef = doc(db, "reviews", reviewId);
+  const snap = await getDoc(reviewRef);
+  if (!snap.exists()) return;
+  const comments: ReviewComment[] = snap.data().comments || [];
+  const updatedComments = comments.map((comm) => {
+    if (comm.id === commentId) {
+      return { ...comm, text: newText };
+    }
+    return comm;
+  });
+  await updateDoc(reviewRef, {
+    comments: updatedComments
+  });
+};
+
+/**
+ * Delete a comment from a review
+ */
+export const deleteCommentFromReview = async (
+  reviewId: string,
+  commentId: string
+): Promise<void> => {
+  const reviewRef = doc(db, "reviews", reviewId);
+  const snap = await getDoc(reviewRef);
+  if (!snap.exists()) return;
+  const comments: ReviewComment[] = snap.data().comments || [];
+  const updatedComments = comments.filter((comm) => comm.id !== commentId);
+  await updateDoc(reviewRef, {
+    comments: updatedComments
+  });
+};
+
+/**
+ * Update a review's rating and comment
+ */
+export const updateMovieReview = async (
+  reviewId: string,
+  rating: number,
+  comment: string
+): Promise<void> => {
+  const reviewRef = doc(db, "reviews", reviewId);
+  await updateDoc(reviewRef, {
+    rating,
+    comment,
+    publishedAt: serverTimestamp()
+  });
+};
+
+/**
  * Get all public reviews for the Facebook-style social feed
  */
 export const getAllPublicReviews = async (): Promise<ReviewData[]> => {
@@ -577,6 +637,237 @@ export const getMovieReviewForUser = async (uid: string, imdbID: string): Promis
 export const deleteMovieReview = async (uid: string, imdbID: string): Promise<void> => {
   const reviewRef = doc(db, "reviews", `${uid}_${imdbID}`);
   await deleteDoc(reviewRef);
+};
+
+export interface FriendRequest {
+  id: string;
+  senderUid: string;
+  senderName: string;
+  senderPhoto: string;
+  receiverUid: string;
+  receiverName: string;
+  receiverPhoto: string;
+  status: "pending";
+  createdAt: string;
+}
+
+/**
+ * Send a friend request to another user
+ */
+export const sendFriendRequest = async (
+  sender: UserProfile,
+  receiverUid: string
+): Promise<void> => {
+  const receiverProfile = await getUserProfile(receiverUid);
+  if (!receiverProfile) throw new Error("Receiver not found");
+
+  const requestId = `${sender.uid}_${receiverUid}`;
+  await setDoc(doc(db, "friend_requests", requestId), {
+    id: requestId,
+    senderUid: sender.uid,
+    senderName: sender.displayName || "User",
+    senderPhoto: sender.photoURL || "",
+    receiverUid,
+    receiverName: receiverProfile.displayName || "User",
+    receiverPhoto: receiverProfile.photoURL || "",
+    status: "pending",
+    createdAt: new Date().toISOString()
+  });
+};
+
+/**
+ * Accept an incoming friend request
+ */
+export const acceptFriendRequest = async (
+  request: FriendRequest
+): Promise<void> => {
+  const senderRef = doc(db, "users", request.senderUid);
+  const receiverRef = doc(db, "users", request.receiverUid);
+
+  // Update both users' friends arrays
+  await updateDoc(senderRef, {
+    friends: arrayUnion(request.receiverUid)
+  });
+  await updateDoc(receiverRef, {
+    friends: arrayUnion(request.senderUid)
+  });
+
+  // Delete the pending friend request document
+  await deleteDoc(doc(db, "friend_requests", request.id));
+};
+
+/**
+ * Decline an incoming friend request
+ */
+export const declineFriendRequest = async (requestId: string): Promise<void> => {
+  await deleteDoc(doc(db, "friend_requests", requestId));
+};
+
+/**
+ * Cancel a sent friend request
+ */
+export const cancelFriendRequest = async (
+  senderUid: string,
+  receiverUid: string
+): Promise<void> => {
+  const requestId = `${senderUid}_${receiverUid}`;
+  await deleteDoc(doc(db, "friend_requests", requestId));
+};
+
+/**
+ * Remove an existing friendship
+ */
+export const removeFriend = async (
+  uid1: string,
+  uid2: string
+): Promise<void> => {
+  const ref1 = doc(db, "users", uid1);
+  const ref2 = doc(db, "users", uid2);
+  await updateDoc(ref1, {
+    friends: arrayRemove(uid2)
+  });
+  await updateDoc(ref2, {
+    friends: arrayRemove(uid1)
+  });
+};
+
+/**
+ * Fetch incoming and outgoing pending friend requests
+ */
+export const getFriendRequests = async (
+  uid: string
+): Promise<{
+  incoming: FriendRequest[];
+  outgoing: FriendRequest[];
+}> => {
+  const requestsCol = collection(db, "friend_requests");
+
+  // Query incoming
+  const qIncoming = query(
+    requestsCol,
+    where("receiverUid", "==", uid),
+    where("status", "==", "pending")
+  );
+  const snapIncoming = await getDocs(qIncoming);
+  const incoming: FriendRequest[] = [];
+  snapIncoming.forEach((doc) => {
+    incoming.push(doc.data() as FriendRequest);
+  });
+
+  // Query outgoing
+  const qOutgoing = query(
+    requestsCol,
+    where("senderUid", "==", uid),
+    where("status", "==", "pending")
+  );
+  const snapOutgoing = await getDocs(qOutgoing);
+  const outgoing: FriendRequest[] = [];
+  snapOutgoing.forEach((doc) => {
+    outgoing.push(doc.data() as FriendRequest);
+  });
+
+  return { incoming, outgoing };
+};
+
+/**
+ * Get all registered user profiles
+ */
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  const usersCol = collection(db, "users");
+  const snap = await getDocs(usersCol);
+  const users: UserProfile[] = [];
+  snap.forEach((doc) => {
+    users.push(doc.data() as UserProfile);
+  });
+  return users;
+};
+
+/**
+ * Get multiple user profiles by list of UIDs
+ */
+export const getFriendsProfiles = async (
+  uids: string[]
+): Promise<UserProfile[]> => {
+  if (!uids || uids.length === 0) return [];
+  const profiles = await Promise.all(
+    uids.map((uid) => getUserProfile(uid))
+  );
+  return profiles.filter((p): p is UserProfile => p !== null);
+};
+
+export interface SharedMovie {
+  id: string;
+  senderUid: string;
+  senderName: string;
+  senderPhoto: string;
+  receiverUid: string;
+  imdbID: string;
+  movieTitle: string;
+  moviePoster: string;
+  movieType: string;
+  message: string;
+  createdAt: string;
+}
+
+/**
+ * Share a movie internally with a friend
+ */
+export const shareMovieWithFriend = async (
+  sender: UserProfile,
+  friendUid: string,
+  movie: { imdbID: string; Title: string; Poster: string; Type: string },
+  message: string
+): Promise<void> => {
+  const shareRef = doc(collection(db, "shares"));
+  await setDoc(shareRef, {
+    id: shareRef.id,
+    senderUid: sender.uid,
+    senderName: sender.displayName || "User",
+    senderPhoto: sender.photoURL || "",
+    receiverUid: friendUid,
+    imdbID: movie.imdbID,
+    movieTitle: movie.Title,
+    moviePoster: movie.Poster,
+    movieType: movie.Type,
+    message,
+    createdAt: new Date().toISOString()
+  });
+};
+
+/**
+ * Get all movies shared with a specific user
+ */
+export const getSharedMovies = async (uid: string): Promise<SharedMovie[]> => {
+  const sharesCol = collection(db, "shares");
+  const q = query(sharesCol, where("receiverUid", "==", uid));
+  const snap = await getDocs(q);
+  const shares: SharedMovie[] = [];
+  snap.forEach((doc) => {
+    shares.push(doc.data() as SharedMovie);
+  });
+  // Sort by createdAt descending
+  return shares.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+/**
+ * Get all reviews posted by a list of friend UIDs
+ */
+export const getFriendsReviews = async (friendUids: string[]): Promise<ReviewData[]> => {
+  if (!friendUids || friendUids.length === 0) return [];
+  try {
+    const reviewsArrays = await Promise.all(
+      friendUids.map((friendUid) => getUserReviews(friendUid))
+    );
+    const allReviews = reviewsArrays.flat();
+    return allReviews.sort((a, b) => {
+      const timeA = a.publishedAt?.seconds || 0;
+      const timeB = b.publishedAt?.seconds || 0;
+      return timeB - timeA;
+    });
+  } catch (err) {
+    console.error("Error fetching friends reviews:", err);
+    return [];
+  }
 };
 
 

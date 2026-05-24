@@ -28,7 +28,7 @@ const AVATAR_PRESETS = [
   {
     id: "preset-5",
     name: "3D Render",
-    url: "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&h=150&q=80"
+    url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=150&h=150&q=80"
   },
   {
     id: "preset-6",

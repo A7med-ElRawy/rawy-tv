@@ -13,6 +13,8 @@ import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import AchievementsPage from "./pages/AchievementsPage";
+import WatchPage from "./pages/WatchPage";
+import FriendsPage from "./pages/FriendsPage";
 
 import { LanguageProvider } from "./context/LanguageContext";
 
@@ -30,6 +32,8 @@ export default function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/achievements" element={<AchievementsPage />} />
+                <Route path="/watch/:type/:id" element={<WatchPage />} />
+                <Route path="/friends" element={<FriendsPage />} />
               </Routes>
             </Layout>
           </Router>

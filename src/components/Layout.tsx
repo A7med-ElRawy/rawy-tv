@@ -16,6 +16,7 @@ import {
   Star,
   Zap,
   Award,
+  Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { movieService, Movie } from "../services/movieService";
@@ -223,6 +224,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: t("library"), path: "/library", icon: Bookmark },
     { name: t("reviews"), path: "/reviews", icon: MessageSquare },
     { name: t("achievements"), path: "/achievements", icon: Trophy },
+    { name: t("friends"), path: "/friends", icon: Users },
     { name: t("settings"), path: "/settings", icon: Settings },
   ];
 
