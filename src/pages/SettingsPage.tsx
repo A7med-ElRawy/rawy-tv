@@ -129,12 +129,19 @@ const SettingsPage: React.FC = () => {
         type: "success",
         message: t("updateSuccess"),
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setStatus({
-        type: "error",
-        message: t("updateError"),
-      });
+      if (err?.message === "NAME_TAKEN") {
+        setStatus({
+          type: "error",
+          message: t("nameTaken"),
+        });
+      } else {
+        setStatus({
+          type: "error",
+          message: t("updateError"),
+        });
+      }
     } finally {
       setIsSaving(false);
     }

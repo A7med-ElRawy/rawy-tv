@@ -263,12 +263,44 @@ export const isMovieInWatchLater = async (
 /**
  * Update user profile details in Firestore
  */
+/**
+ * Check if a display name is already taken by another user
+ */
+export const isDisplayNameTaken = async (
+  uid: string,
+  displayName: string
+): Promise<boolean> => {
+  const trimmedName = displayName.trim();
+  if (!trimmedName) return false;
+
+  const usersCol = collection(db, "users");
+  const q = query(usersCol, where("displayName", "==", trimmedName));
+  const snap = await getDocs(q);
+
+  let taken = false;
+  snap.forEach((docSnap) => {
+    if (docSnap.id !== uid) {
+      taken = true;
+    }
+  });
+
+  return taken;
+};
+
 export const updateUserProfile = async (
   uid: string,
   displayName: string | null,
   photoURL: string | null,
   reviewPrivacy?: "public" | "friends" | "private",
 ): Promise<void> => {
+  // Check if display name is already taken by another user
+  if (displayName) {
+    const taken = await isDisplayNameTaken(uid, displayName);
+    if (taken) {
+      throw new Error("NAME_TAKEN");
+    }
+  }
+
   const userRef = doc(db, "users", uid);
   const updateData: any = {
     displayName,
@@ -279,16 +311,18 @@ export const updateUserProfile = async (
   }
   await updateDoc(userRef, updateData);
 
-  // Synchronize review privacy settings on all their past published reviews
-  if (reviewPrivacy) {
-    const reviewsCol = collection(db, "reviews");
-    const q = query(reviewsCol, where("uid", "==", uid));
-    const snap = await getDocs(q);
-    const promises = snap.docs.map((docSnap) =>
-      updateDoc(docSnap.ref, { privacy: reviewPrivacy })
-    );
-    await Promise.all(promises);
-  }
+  // Synchronize review credentials and privacy settings on all their past published reviews
+  const reviewsCol = collection(db, "reviews");
+  const q = query(reviewsCol, where("uid", "==", uid));
+  const snap = await getDocs(q);
+  const promises = snap.docs.map((docSnap) => {
+    const updateObj: any = {};
+    if (displayName) updateObj.displayName = displayName;
+    if (photoURL !== undefined) updateObj.photoURL = photoURL;
+    if (reviewPrivacy) updateObj.privacy = reviewPrivacy;
+    return updateDoc(docSnap.ref, updateObj);
+  });
+  await Promise.all(promises);
 };
 
 /**

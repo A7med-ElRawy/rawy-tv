@@ -102,6 +102,7 @@ export const translations = {
     reviewPublished: "Review published successfully!",
     reviewError: "Failed to publish review. Please try again.",
     writtenOn: "Written on",
+    nameTaken: "This display name is already taken. Please choose another one.",
 
     // Privacy Settings
     privacySettings: "Critique Privacy",
@@ -212,6 +213,7 @@ export const translations = {
     reviewPublished: "تم نشر التقييم بنجاح!",
     reviewError: "فشل نشر التقييم. يرجى المحاولة مرة أخرى.",
     writtenOn: "كتب في",
+    nameTaken: "هذا الاسم مستخدم بالفعل. يرجى اختيار اسم آخر.",
 
     // Privacy Settings
     privacySettings: "خصوصية المراجعات",
