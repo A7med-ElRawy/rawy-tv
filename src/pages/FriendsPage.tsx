@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import PageLoader from "../components/PageLoader";
 import {
   UserProfile,
   FriendRequest,
@@ -32,6 +33,7 @@ import {
   getUserProfile,
   getSharedMovies,
   SharedMovie,
+  seedMockUsers,
 } from "../utils/firebaseUtils";
 
 const FriendsPage: React.FC = () => {
@@ -267,8 +269,8 @@ const FriendsPage: React.FC = () => {
       {/* Loading State */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 min-h-[30vh]">
-          <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+          <PageLoader />
+          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mt-4">
             {t("scanning")}
           </p>
         </div>
@@ -386,7 +388,7 @@ const FriendsPage: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("searchUsersPlaceholder")}
-                  className="w-full bg-zinc-900/30 border border-zinc-800 py-3.5 pl-12 pr-4 text-xs font-bold text-white focus:outline-none focus:border-brand focus:bg-black/40 transition-all placeholder:text-zinc-600 uppercase tracking-widest"
+                  className="w-full bg-zinc-900/30 border border-zinc-800 py-3.5 pl-12 pr-4 text-xs font-bold text-white focus:outline-none focus:border-brand focus:bg-black/40 transition-all placeholder:text-zinc-650 uppercase tracking-widest"
                 />
               </div>
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft, Play, Tv, AlertCircle } from "lucide-react";
+import { ArrowLeft, Play, Tv, AlertCircle } from "lucide-react";
 import { movieService, DetailedMovie } from "../services/movieService";
 import { useLanguage } from "../context/LanguageContext";
 import { motion } from "motion/react";
+import PageLoader from "../components/PageLoader";
 
 const WatchPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -69,8 +70,8 @@ const WatchPage: React.FC = () => {
   if (loading || checkingPlayer) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
-        <Loader2 className="w-12 h-12 text-brand animate-spin mb-4" />
-        <p className="text-zinc-500 animate-pulse font-medium uppercase tracking-widest text-[10px] font-black">
+        <PageLoader />
+        <p className="text-zinc-500 animate-pulse font-medium uppercase tracking-widest text-[10px] font-black mt-4">
           {language === "ar" ? "جاري تجهيز مشغل السينما..." : "Initializing Cinema Player..."}
         </p>
       </div>

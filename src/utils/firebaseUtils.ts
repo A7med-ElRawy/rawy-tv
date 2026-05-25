@@ -56,10 +56,22 @@ export const initializeUserProfile = async (
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
+    let finalDisplayName = userData.displayName;
+    if (finalDisplayName) {
+      const taken = await isDisplayNameTaken(uid, finalDisplayName);
+      if (taken) {
+        let suffix = 1;
+        while (await isDisplayNameTaken(uid, `${finalDisplayName} ${suffix}`)) {
+          suffix++;
+        }
+        finalDisplayName = `${finalDisplayName} ${suffix}`;
+      }
+    }
+
     await setDoc(userRef, {
       uid,
       email: userData.email,
-      displayName: userData.displayName,
+      displayName: finalDisplayName,
       photoURL: userData.photoURL,
       reviewPrivacy: "public",
       lastLogin: serverTimestamp(),
@@ -73,12 +85,18 @@ export const initializeUserProfile = async (
       createdAt: serverTimestamp(),
     });
   } else {
-    // Update existing user with new login info
-    await updateDoc(userRef, {
-      displayName: userData.displayName,
-      photoURL: userData.photoURL,
+    // Update existing user login time and set missing info, preserving custom details
+    const existingData = userSnap.data();
+    const updateData: any = {
       lastLogin: serverTimestamp(),
-    });
+    };
+    if (!existingData?.displayName) {
+      updateData.displayName = userData.displayName;
+    }
+    if (!existingData?.photoURL) {
+      updateData.photoURL = userData.photoURL;
+    }
+    await updateDoc(userRef, updateData);
   }
 };
 
@@ -274,17 +292,19 @@ export const isDisplayNameTaken = async (
   uid: string,
   displayName: string
 ): Promise<boolean> => {
-  const trimmedName = displayName.trim();
+  const trimmedName = displayName.trim().toLowerCase();
   if (!trimmedName) return false;
 
   const usersCol = collection(db, "users");
-  const q = query(usersCol, where("displayName", "==", trimmedName));
-  const snap = await getDocs(q);
+  const snap = await getDocs(usersCol);
 
   let taken = false;
   snap.forEach((docSnap) => {
     if (docSnap.id !== uid) {
-      taken = true;
+      const existingName = docSnap.data().displayName;
+      if (existingName && existingName.trim().toLowerCase() === trimmedName) {
+        taken = true;
+      }
     }
   });
 
@@ -868,6 +888,74 @@ export const getFriendsReviews = async (friendUids: string[]): Promise<ReviewDat
     console.error("Error fetching friends reviews:", err);
     return [];
   }
+};
+
+/**
+ * Seed 100 mock community users in Firestore database
+ */
+export const seedMockUsers = async (): Promise<void> => {
+  const firstNames = [
+    "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Jamie", "Riley", "Cameron", "Skyler", "Rowan",
+    "Avery", "Peyton", "Quinn", "Hayden", "Logan", "Charlie", "Reese", "Parker", "Dakota", "Phoenix",
+    "Emma", "Liam", "Olivia", "Noah", "Ava", "Oliver", "Sophia", "Elijah", "Isabella", "James",
+    "Amelia", "Benjamin", "Mia", "Lucas", "Charlotte", "Mason", "Harper", "Ethan", "Evelyn", "Alexander",
+    "Abigail", "Daniel", "Emily", "Matthew", "Elizabeth", "Henry", "Sofia", "Joseph", "Aria", "Jackson"
+  ];
+  const lastNames = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
+    "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
+    "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
+    "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
+    "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts"
+  ];
+
+  const avatarUrls = [
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
+    "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&h=150&q=80"
+  ];
+
+  const batchSize = 100;
+  const promises = [];
+
+  for (let i = 0; i < batchSize; i++) {
+    const fName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const displayName = `${fName} ${lName}`;
+    const email = `${fName.toLowerCase()}.${lName.toLowerCase()}${Math.floor(Math.random() * 90 + 10)}@moviehub.com`;
+    const photoURL = avatarUrls[Math.floor(Math.random() * avatarUrls.length)];
+    const level = Math.floor(Math.random() * 10) + 1;
+    const mockUid = `mock_user_${i + 1}`;
+
+    const userRef = doc(db, "users", mockUid);
+    promises.push(
+      setDoc(userRef, {
+        uid: mockUid,
+        email,
+        displayName,
+        photoURL,
+        reviewPrivacy: "public",
+        lastLogin: new Date().toISOString(),
+        favorites: [],
+        watchLater: [],
+        recentlyViewed: [],
+        lastWatched: null,
+        ratings: {},
+        friends: [],
+        level,
+        createdAt: new Date().toISOString()
+      })
+    );
+  }
+
+  await Promise.all(promises);
 };
 
 

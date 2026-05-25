@@ -34,6 +34,7 @@ import {
   UserProfile,
 } from "../utils/firebaseUtils";
 import MovieImage from "../components/MovieImage";
+import Loader from "../components/Loader";
 
 
 const getGenreColorClass = (genre: string): { bg: string; text: string; border: string; hover: string } => {
@@ -494,8 +495,8 @@ const MovieDetailPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
-        <Loader2 className="w-12 h-12 text-brand animate-spin mb-4" />
-        <p className="text-zinc-500 animate-pulse font-medium">
+        <Loader />
+        <p className="text-zinc-500 font-bold tracking-widest text-xs uppercase mt-8 animate-pulse">
           Loading high-quality cinematics...
         </p>
       </div>
@@ -870,49 +871,85 @@ const MovieDetailPage: React.FC = () => {
                 {t("rateTitle")}
               </h3>
 
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <div key={star} className="relative flex">
-                    {/* Left half */}
-                    <div
-                      className="w-6 h-12 cursor-pointer z-10"
-                      onMouseEnter={() => handleHoverInteraction(star, true)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => handleStarInteration(star, true)}
-                    />
-                    {/* Right half */}
-                    <div
-                      className="w-6 h-12 cursor-pointer z-10"
-                      onMouseEnter={() => handleHoverInteraction(star, false)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => handleStarInteration(star, false)}
-                    />
+              <div className="flex items-center gap-6">
+                <div className="radio">
+                  <input
+                    id="rating-5"
+                    type="radio"
+                    name="rating"
+                    value={5}
+                    checked={userRating === 5}
+                    onChange={() => setRating(movie.imdbID, 5)}
+                  />
+                  <label htmlFor="rating-5" title="5 stars">
+                    <svg viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z" />
+                    </svg>
+                  </label>
 
-                    {/* Visual Star */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="relative">
-                        <Star className="w-10 h-10 text-zinc-800" />
-                        <div
-                          className="absolute inset-0 overflow-hidden"
-                          style={{
-                            width: `${Math.max(0, Math.min(100, ((hoverRating || userRating) - (star - 1)) * 100))}%`,
-                          }}
-                        >
-                          <Star className="w-10 h-10 text-yellow-500 fill-current drop-shadow-[0_0_8px_rgba(234,179,8,0.3)]" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {(userRating > 0 || hoverRating > 0) && (
-                  <span className="ml-6 text-sm font-black uppercase tracking-widest text-yellow-500">
-                    {(hoverRating || userRating).toFixed(1)}/5.0
+                  <input
+                    id="rating-4"
+                    type="radio"
+                    name="rating"
+                    value={4}
+                    checked={userRating === 4}
+                    onChange={() => setRating(movie.imdbID, 4)}
+                  />
+                  <label htmlFor="rating-4" title="4 stars">
+                    <svg viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z" />
+                    </svg>
+                  </label>
+
+                  <input
+                    id="rating-3"
+                    type="radio"
+                    name="rating"
+                    value={3}
+                    checked={userRating === 3}
+                    onChange={() => setRating(movie.imdbID, 3)}
+                  />
+                  <label htmlFor="rating-3" title="3 stars">
+                    <svg viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z" />
+                    </svg>
+                  </label>
+
+                  <input
+                    id="rating-2"
+                    type="radio"
+                    name="rating"
+                    value={2}
+                    checked={userRating === 2}
+                    onChange={() => setRating(movie.imdbID, 2)}
+                  />
+                  <label htmlFor="rating-2" title="2 stars">
+                    <svg viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z" />
+                    </svg>
+                  </label>
+
+                  <input
+                    id="rating-1"
+                    type="radio"
+                    name="rating"
+                    value={1}
+                    checked={userRating === 1}
+                    onChange={() => setRating(movie.imdbID, 1)}
+                  />
+                  <label htmlFor="rating-1" title="1 star">
+                    <svg viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z" />
+                    </svg>
+                  </label>
+                </div>
+
+                {userRating > 0 && (
+                  <span className="text-xl font-black uppercase tracking-widest text-yellow-500">
+                    {userRating.toFixed(1)}/5.0
                   </span>
                 )}
               </div>
-              <p className="mt-4 text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                {t("hoverRate")}
-              </p>
             </div>
 
             {/* Share Movie Section */}

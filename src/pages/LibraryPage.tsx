@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Heart, Clock, Loader2, PlayCircle, PlusCircle } from "lucide-react";
+import { Heart, Clock, PlayCircle, PlusCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import PageLoader from "../components/PageLoader";
 import { useMovies } from "../context/MovieContext";
 import { movieService, Movie } from "../services/movieService";
 import MovieCard from "../components/MovieCard";
@@ -118,8 +119,8 @@ const LibraryPage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center justify-center py-32"
           >
-            <Loader2 className="w-12 h-12 text-zinc-300 animate-spin mb-4" />
-            <p className="text-zinc-500 font-medium">{t("updatingCollections")}</p>
+            <PageLoader />
+            <p className="text-zinc-500 font-medium mt-4">{t("updatingCollections")}</p>
           </motion.div>
         ) : movies.length === 0 ? (
           <motion.div

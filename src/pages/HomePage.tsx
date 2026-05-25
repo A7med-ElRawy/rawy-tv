@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { movieService, Movie } from "../services/movieService";
 import MovieCard from "../components/MovieCard";
 import { useLanguage } from "../context/LanguageContext";
+import Loader from "../components/Loader";
 
 const HomePage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -241,10 +242,10 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-20"
+              className="flex flex-col items-center justify-center py-24"
             >
-              <Loader2 className="w-10 h-10 text-brand animate-spin mb-4" />
-              <p className="text-zinc-500 font-medium uppercase tracking-widest text-[10px] font-black">
+              <Loader />
+              <p className="text-zinc-500 font-medium uppercase tracking-widest text-[10px] font-black mt-8">
                 {t("fetchingMagic")}
               </p>
             </motion.div>
