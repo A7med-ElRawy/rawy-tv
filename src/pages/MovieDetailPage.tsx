@@ -442,54 +442,16 @@ const MovieDetailPage: React.FC = () => {
   useEffect(() => {
     if (!movie) return;
 
-    const checkStreamAvailability = async () => {
-      setIsStreamChecking(true);
+    // Do not preflight the embed URL through a third-party CORS proxy. The proxy
+    // often times out or rewrites the player response, which incorrectly marks
+    // every title as unavailable. Let the player handle availability directly.
+    const currentYear = new Date().getFullYear();
+    const movieYear = parseInt(movie.Year);
+    const isReleased = isNaN(movieYear) || movieYear <= currentYear;
+    const hasPlayableId = Boolean(movie.externalImdbId?.startsWith("tt"));
 
-      // 1. Future Year Check: if movie release year is in the future, it's not out yet
-      const currentYear = new Date().getFullYear();
-      const movieYear = parseInt(movie.Year);
-      if (!isNaN(movieYear) && movieYear > currentYear) {
-        setIsStreamAvailable(false);
-        setIsStreamChecking(false);
-        return;
-      }
-
-      // 2. IMDb ID presence check
-      const hasImdbId = movie.externalImdbId && movie.externalImdbId.startsWith("tt");
-      if (!hasImdbId) {
-        setIsStreamAvailable(false);
-        setIsStreamChecking(false);
-        return;
-      }
-
-      // 3. Network pre-check via CORS proxy
-      const url = `https://vaplayer.ru/embed/${movie.Type}/${movie.externalImdbId || movie.imdbID}`;
-      try {
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for proxy
-
-        const response = await fetch(proxyUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          setIsStreamAvailable(false);
-        } else {
-          const data = await response.json();
-          const html: string = data.contents || "";
-          // If the page content contains 404 indicators, stream is not available
-          const is404 = html.includes("404") || html.toLowerCase().includes("content not found") || html.toLowerCase().includes("not found");
-          setIsStreamAvailable(!is404);
-        }
-      } catch (err: any) {
-        // If proxy call fails or times out, mark as unavailable to be safe
-        setIsStreamAvailable(false);
-      } finally {
-        setIsStreamChecking(false);
-      }
-    };
-
-    checkStreamAvailability();
+    setIsStreamAvailable(isReleased && hasPlayableId);
+    setIsStreamChecking(false);
   }, [movie]);
 
   if (loading) {
